@@ -70,10 +70,21 @@ docker compose -f docker-compose.submission.yml run --rm --build \
 
 #### `cuda12.9` (`cuda129`)
 
-Команда для запуска оценки:
+Команда для запуска оценки (рекомендовано после первой сборки в условиях отсутствия интеренат):
 
 ```bash
-docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
+docker compose -f docker-compose.submission.cuda129.yml run --r  \
+  -v /home/kirill/mnt/ssd_1tb_1/kryp/test_public:/workspace/inference_audio:ro submission-cu129 \
+  --audio-root /workspace/inference_audio \
+  --k 10 \
+  --num-workers 16 \
+  --gpu-model-instances 3
+```
+
+Команда для запуска с дополнительной сборкой
+
+```bash
+docker compose -f docker-compose.submission.cuda129.yml run --r --build \
   -v /home/kirill/mnt/ssd_1tb_1/kryp/test_public:/workspace/inference_audio:ro submission-cu129 \
   --audio-root /workspace/inference_audio \
   --k 10 \
