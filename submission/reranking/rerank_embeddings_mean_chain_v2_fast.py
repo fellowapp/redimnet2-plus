@@ -1222,6 +1222,9 @@ def main() -> None:
         args.output_prefix or (input_path.parent / f"{input_path.stem}_mean_chain_v2"),
     )
     output_prefix.parent.mkdir(parents=True, exist_ok=True)
+    intermediate_output_prefix = output_prefix.with_name(
+        f"INTERMEDIATE_SAVE_YOU_SHOULD_WAIT_FOR_FINAL_{output_prefix.name}"
+    )
     phase_times: dict[str, float] = {}
 
     print(f"loading {input_path}")
@@ -1264,14 +1267,24 @@ def main() -> None:
         else _precision_at_ks_from_neighbors(mean_chain_nbrs, speaker_labels, metric_ks)
     )
     _graph_stats(mean_chain_nbrs, "mean_chain")
+    intermediate_csv_path = intermediate_output_prefix.with_suffix(".neighbors.csv")
+    t_phase = time.perf_counter()
+    _write_neighbors_csv(
+        payload,
+        mean_chain_nbrs,
+        intermediate_csv_path,
+        filepath_prefix=args.neighbors_filepath_prefix,
+    )
+    phase_times["write_intermediate_csv"] = time.perf_counter() - t_phase
+    print(f"wrote intermediate mean-chain neighbors: {intermediate_csv_path}")
 
     avg_sims = np.zeros(embeddings.shape[0], dtype=np.float32)
     cur = mean_chain_nbrs.copy()
     rerank_total = 0.0
-    skip_v2_rerank = int(args.k) > 501
+    skip_v2_rerank = int(args.k) > 100
     if skip_v2_rerank:
         print(
-            "[info] k>50: skipping v2 graph-rerank stage (iterative _rerank_pass); "
+            "[info] k>100: skipping v2 graph-rerank stage (iterative _rerank_pass); "
             "running community on mean-chain output.",
             flush=True,
         )
@@ -1354,6 +1367,7 @@ def main() -> None:
     phase_times["write_csv"] = time.perf_counter() - t_phase
     summary = {
         "input_embeddings_pkl": str(input_path),
+        "intermediate_mean_chain_neighbors_csv": str(intermediate_csv_path),
         "output_neighbors_csv": str(csv_path),
         "neighbors_filepath_prefix": args.neighbors_filepath_prefix,
         "num_items": int(len(audio_ids)),
