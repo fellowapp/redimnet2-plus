@@ -230,7 +230,7 @@ docker compose -f docker-compose.submission.yml run --rm \
 | [`docs/CONFIGS.md`](docs/CONFIGS.md) | Карта Hydra-конфигов: model / data / augment / loss / logging / accelerate. |
 | [`docs/DATA_PREPROCESSING_PIPELINE.md`](docs/DATA_PREPROCESSING_PIPELINE.md) | Детальный граф обработки внутри датасета и collate. |
 | [`docs/TENSORRT_CONVERSION_AND_BENCHMARKING.md`](docs/TENSORRT_CONVERSION_AND_BENCHMARKING.md) | Экспорт чекпоинта в `.plan` + бенч TensorRT. |
-| [`docs/Docker (TensorRT).md`](<docs/Docker (TensorRT).md>) | Сборка TensorRT-образа, прогрев движка и инференс через `docker compose`. |
+| [`docs/Docker (TensorRT).md`](<docs/Docker (TensorRT).md>) | НЕ ИСПОЛЬЗОВАТЬ КАК ОСНОВНОЙ ДОКЕР ОБРАЗ. ПЕРФОМАНС НЕМНОГО ХУЖЕ. Сборка TensorRT-образа, прогрев движка и инференс через `docker compose`. |
 
 ## Быстрая шпаргалка
 
