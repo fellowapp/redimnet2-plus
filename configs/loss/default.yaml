@@ -1,0 +1,2 @@
+# Primary loss; override group or set _target_ / kwargs from CLI.
+_target_: torch.nn.CrossEntropyLoss

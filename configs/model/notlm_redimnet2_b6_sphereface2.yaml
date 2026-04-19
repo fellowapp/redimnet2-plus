@@ -1,0 +1,15 @@
+# ReDimNet2-B0 + SphereFace2 head (pairs with ``loss=sphereface2``).
+defaults:
+  - notlm_redimnet2_b6_pretrained
+
+classifier:
+  _target_: asv.models.classifier.SphereFace2Head
+  in_features: 192
+  num_classes: ${model.num_classes}
+  scale: 32.0
+  margin: 0.35
+  first_margin: null
+  last_margin: null
+  lanbuda: 0.7
+  t: 3
+  margin_type: C

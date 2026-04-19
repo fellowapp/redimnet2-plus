@@ -1,0 +1,37 @@
+# Command 1: build the image and start a short-lived container with
+# `./weights` and `./outputs` mounted into `/workspace`.
+#   docker compose -f docker-compose.submission.yml run --rm --build \
+#     --entrypoint /bin/bash submission -lc \
+#     "ls -ld /workspace/weights /workspace/outputs"
+#
+# Command 2: choose the mount point inside the container yourself and pass the
+# same path to the script with `--audio-root`.
+#   docker compose -f docker-compose.submission.yml run --rm \
+#     -v /abs/path/to/audio:/workspace/inference_audio:ro submission \
+#     --audio-root /workspace/inference_audio \
+#     --k 10 --num-workers 8 --gpu-model-instances 3
+#
+# Default CSV on the host: ./outputs/output.csv
+
+services:
+  submission:
+    build:
+      context: .
+      dockerfile: Dockerfile.submission
+    image: asv-submission:latest
+    working_dir: /workspace
+    ipc: host
+    shm_size: "2gb"
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    entrypoint: ["/usr/local/bin/submission-runtime-entrypoint.sh"]
+    volumes:
+      - type: bind
+        source: ./weights
+        target: /workspace/weights
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /workspace/outputs

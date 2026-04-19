@@ -1,0 +1,90 @@
+# No codecs here; this file defines augmentation-only composition.
+enabled: true
+
+# Apply to audio returned by load_with_torchcodec.
+_target_: asv.augment.build_audio_augmentor
+
+# "Levels" let you group related effects and gate each group by probability.
+waveform_levels:
+  - name: filters
+    p: 0.3
+    one_of: true
+    transforms:
+      - _target_: torch_audiomentations.BandPassFilter
+        min_center_frequency: 1200.0 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_center_frequency: 4000.0 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        min_bandwidth_fraction: 1.34 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_bandwidth_fraction: 1.99 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        p: 1.0
+      - _target_: torch_audiomentations.BandStopFilter
+        min_center_frequency: 200.0 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_center_frequency: 4000.0 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        min_bandwidth_fraction: 0.05 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_bandwidth_fraction: 1.46 # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        p: 1.0
+      - _target_: torch_audiomentations.HighPassFilter
+        min_cutoff_freq: 20.0  # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_cutoff_freq: 1800.0  # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        p: 1.0
+      - _target_: torch_audiomentations.LowPassFilter
+        min_cutoff_freq: 1200.0  # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        max_cutoff_freq: 7500.0  # DO NOT CHANGE IN ANY CASE. It can be changed only manually
+        p: 1.0
+
+  - name: additive_noise
+    p: 0.3
+    one_of: true
+    transforms:
+      - _target_: torch_audiomentations.AddColoredNoise
+        min_snr_in_db: 3.0
+        max_snr_in_db: 20.0
+        p: 1.0
+      - _target_: torch_audiomentations.AddBackgroundNoise
+        background_paths:
+          - ${oc.env:MUSAN_PATH}
+        min_snr_in_db: 3.0
+        max_snr_in_db: 20.0
+        p: 1.0
+      - _target_: asv.augment.RawBoostTransform
+        algo: 5
+        cfg: {}
+        p: 1.0
+
+  - name: rir
+    p: 0.3
+    one_of: true
+    transforms:
+      - _target_: torch_audiomentations.ApplyImpulseResponse
+        ir_paths:
+          - ${oc.env:RIRS_PATH}
+        p: 1.0
+
+  - name: perturb
+    p: 0.1
+    one_of: true
+    transforms:
+      - _target_: asv.augment.SpeedPerturbation
+        min_rate: 0.9
+        max_rate: 1.1
+        p: 1.0
+
+# Spectrogram-domain augmentations applied in :class:`asv.data.collate.SpectrogramCollator` (not via
+# AudioAugmentPipeline.apply_to_features). Read by :func:`asv.train.spec_augment.build_spec_augment_cfg`.
+# Do not add ``transforms:`` here: that would run the same mel twice (collate + pipeline) or confuse
+# the pipeline, which expects instantiated ``nn.Module`` entries for feature levels.
+feature_levels:
+  - name: spec_augment
+    # Probability of applying this spec-augment stage at all (then one of freq / time / cutmix, uniform).
+    p: 0.2
+    one_of: true
+    spec_augment:
+      freq_mask:
+        p: 0.5
+        max_width: 8
+      time_mask:
+        p: 0.5
+        max_width: 10
+      cutmix:
+        p: 0.3
+        min_frames: 5
+        max_frames: 30

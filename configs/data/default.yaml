@@ -1,0 +1,22 @@
+# Manifest, decoding, collation, input mode (waveform | spectrogram).
+manifest_path: null
+# Resolved at runtime; set via CLI: python train.py data.manifest_path=/path/to/manifest.parquet
+batch_size: 32
+num_workers: 4
+sample_rate: 16000
+input_mode: waveform
+max_duration_sec: null
+pin_memory: true
+prefetch_factor: 2
+# trim_num_samples: 64400
+trim_num_samples: 96000
+codec_preset: null
+transform_probabilities:
+  # keep_original: 0.5 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  # codec_only: 0.2 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  # augment_only: 0.2 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  # codec_then_augment: 0.1 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  keep_original: 0.5 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  codec_only: 0.1 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  augment_only: 0.35 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually
+  codec_then_augment: 0.05 # DO NOT CHANGE IN ANY KEYS. It can be changed only manually

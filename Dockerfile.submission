@@ -1,0 +1,37 @@
+# Inference image for submission/run_submission_unified.py
+# GPU: PyTorch CUDA wheels from uv.lock (CUDA 13 user-space libs) + host NVIDIA driver via --gpus all.
+#
+# Weights and outputs are mounted at container runtime; the image only contains code + deps.
+
+FROM python:3.12-slim-bookworm
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
+    VIRTUAL_ENV=/workspace/.venv
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /workspace
+
+COPY uv.lock pyproject.toml README.md /workspace/
+COPY asv /workspace/asv
+COPY benchmarking /workspace/benchmarking
+COPY configs /workspace/configs
+COPY submission /workspace/submission
+COPY submission-runtime-entrypoint.sh /usr/local/bin/submission-runtime-entrypoint.sh
+
+RUN uv sync --frozen --no-dev
+RUN chmod +x /usr/local/bin/submission-runtime-entrypoint.sh
+
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+RUN mkdir -p /workspace/weights /workspace/outputs /data/audio

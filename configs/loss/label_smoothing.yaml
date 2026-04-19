@@ -1,0 +1,4 @@
+_target_: asv.losses.cross_entropy.LabelSmoothingCrossEntropy
+num_classes: ${model.num_classes}
+smoothing: 0.1
+reduction: mean

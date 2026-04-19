@@ -1,0 +1,5 @@
+# SphereFace2: training loss is computed inside :class:`~asv.models.classifier.SphereFace2Head`.
+# Use :class:`asv.losses.integrated.LossComputedInModel` so Accelerate can ``prepare`` a loss module.
+#
+# Pair with ``model=redimnet2_b0_sphereface2`` (or another model YAML whose classifier is SphereFace2Head).
+_target_: asv.losses.integrated.LossComputedInModel

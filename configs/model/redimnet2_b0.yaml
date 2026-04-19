@@ -1,0 +1,19 @@
+# ReDimNet2-B0 classifier fine-tuning.
+name: redimnet2_b0
+num_classes: 1000
+
+encoder:
+  _target_: asv.models.redimnet2.ReDimNet2Encoder
+  model_name: b0
+  pretrained: false
+  train_type: lm
+  dataset: vox2
+  strict_load: true
+
+bridge:
+  _target_: asv.models.bridge.IdentityBridge
+
+classifier:
+  _target_: asv.models.classifier.LinearClassifier
+  in_features: 192
+  num_classes: ${model.num_classes}

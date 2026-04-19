@@ -1,0 +1,16 @@
+.git
+.cursor
+.venv
+env
+venv
+__pycache__/
+*.py[codz]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.mlop/
+docs/
+submission/reranking/outputs/
+benchmarking/outputs/

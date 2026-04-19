@@ -1,0 +1,18 @@
+# Encoder + bridge + classifier; subtrees are Hydra-instantiated in build_model.
+name: conv_baseline
+num_classes: 1000
+
+encoder:
+  _target_: asv.models.encoder.ConvWaveformEncoder
+  embed_dim: 256
+  in_channels: 1
+  channels: [32, 64, 128, 256]
+  kernel_size: 7
+
+bridge:
+  _target_: asv.models.bridge.IdentityBridge
+
+classifier:
+  _target_: asv.models.classifier.LinearClassifier
+  in_features: ${model.encoder.embed_dim}
+  num_classes: ${model.num_classes}

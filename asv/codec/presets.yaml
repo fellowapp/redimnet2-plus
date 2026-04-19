@@ -1,0 +1,133 @@
+mp3_16k:
+  description: "MP3 via pydub, mono, 16 kHz (`set_frame_rate` + `export`)."
+  export_format: mp3
+  bitrate: 64k
+  target_frame_rate: 16000
+  decode_format: mp3
+  normalize_frame_rate: 16000
+mp3_8k:
+  description: "MP3, mono, 8 kHz."
+  export_format: mp3
+  bitrate: 48k
+  target_frame_rate: 8000
+  decode_format: mp3
+  normalize_frame_rate: 8000
+opus_16k:
+  description: "Opus export then decode with codec='opus'."
+  export_format: opus
+  bitrate: 32k
+  target_frame_rate: 16000
+  decode_codec: opus
+  normalize_frame_rate: 16000
+opus_8k:
+  description: "Opus at 8 kHz."
+  export_format: opus
+  bitrate: 24k
+  target_frame_rate: 8000
+  decode_codec: opus
+  normalize_frame_rate: 8000
+aac_8k:
+  description: "AAC (LC) in MP4, mono, 8 kHz."
+  export_format: mp4
+  export_codec: aac
+  bitrate: 32k
+  target_frame_rate: 8000
+  decode_format: mp4
+  decode_codec: aac
+  normalize_frame_rate: 8000
+aac_16k:
+  description: "AAC (LC) in MP4, mono, 16 kHz."
+  export_format: mp4
+  export_codec: aac
+  bitrate: 64k
+  target_frame_rate: 16000
+  decode_format: mp4
+  decode_codec: aac
+  normalize_frame_rate: 16000
+flac_16k:
+  description: "FLAC (lossless), 16 kHz."
+  export_format: flac
+  target_frame_rate: 16000
+  decode_format: flac
+  normalize_frame_rate: 16000
+vorbis_8k:
+  description: "Ogg Vorbis (`libvorbis`), 8 kHz."
+  export_format: ogg
+  export_codec: libvorbis
+  bitrate: 16k
+  target_frame_rate: 8000
+  decode_format: ogg
+  decode_codec: libvorbis
+  normalize_frame_rate: 8000
+vorbis_16k:
+  description: "Ogg Vorbis (`libvorbis`), 16 kHz."
+  export_format: ogg
+  export_codec: libvorbis
+  bitrate: 96k
+  target_frame_rate: 16000
+  decode_format: ogg
+  decode_codec: libvorbis
+  normalize_frame_rate: 16000
+gsm_ms_8k:
+  description: "G.723.1 in WAV, 8 kHz (used as GSM-family fallback in this environment)."
+  export_format: wav
+  export_codec: g723_1
+  target_frame_rate: 8000
+  decode_format: wav
+  decode_codec: g723_1
+  normalize_frame_rate: 8000
+adpcm_ima_wav_16k:
+  description: "IMA ADPCM in WAV (common compressed WAV)."
+  export_format: wav
+  export_codec: adpcm_ima_wav
+  target_frame_rate: 16000
+  decode_format: wav
+  decode_codec: adpcm_ima_wav
+  normalize_frame_rate: 16000
+g722_16k:
+  description: "G.722 in raw `.g722` bitstream."
+  export_format: g722
+  export_codec: g722
+  target_frame_rate: 16000
+  decode_format: g722
+  normalize_frame_rate: 16000
+pcm_alaw_8k:
+  description: "A-law in WAV."
+  export_format: wav
+  export_codec: pcm_alaw
+  target_frame_rate: 8000
+  decode_format: wav
+  normalize_frame_rate: 8000
+pcm_mulaw_8k:
+  description: "u-law in WAV."
+  export_format: wav
+  export_codec: pcm_mulaw
+  target_frame_rate: 8000
+  decode_format: wav
+  normalize_frame_rate: 8000
+speex_8k:
+  description: "Speex in Ogg."
+  export_format: ogg
+  export_codec: libspeex
+  bitrate: 16k
+  target_frame_rate: 8000
+  decode_format: ogg
+  decode_codec: libspeex
+  normalize_frame_rate: 8000
+speex_16k:
+  description: "Speex wideband in Ogg."
+  export_format: ogg
+  export_codec: libspeex
+  bitrate: 20k
+  target_frame_rate: 16000
+  decode_format: ogg
+  decode_codec: libspeex
+  normalize_frame_rate: 16000
+amr_nb:
+  description: "AMR-NB (`.amr`); many ffmpeg builds omit this encoder."
+  export_format: amr
+  export_codec: libopencore_amrnb
+  bitrate: 12.2k
+  target_frame_rate: 8000
+  decode_format: amr
+  normalize_frame_rate: 8000

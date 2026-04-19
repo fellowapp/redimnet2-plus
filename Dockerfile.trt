@@ -1,0 +1,78 @@
+FROM nvcr.io/nvidia/tensorrt:25.01-py3
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    VIRTUAL_ENV=/opt/venv \
+    PATH="/opt/venv/bin:${PATH}" \
+    ASV_ARTIFACTS_DIR=/opt/asv/artifacts \
+    ASV_EXPORT_SUMMARY=/opt/asv/artifacts/export_summary.json \
+    ASV_DEFAULT_VARIANT=frontend_fp32_model_fp16
+
+ARG ASV_CHECKPOINT=weights
+ARG ASV_MODEL_NAME=b6
+ARG ASV_MODEL_CONFIG=configs/model/redimnet2_b6.yaml
+ARG ASV_BATCH_SIZE=32
+ARG ASV_NUM_SAMPLES=96000
+ARG ASV_GPU_ID=0
+ARG ASV_SEED=1234
+ARG ASV_TORCH_REFERENCE_DEVICE=cpu
+ARG ASV_WORKSPACE_GIB=4.0
+ARG ASV_BUILDER_OPT_LEVEL=5
+ARG ASV_MAX_AUX_STREAMS=0
+
+# Bake build-args into the image so the entrypoint has the same values at runtime (compose
+# passes these as build args; plain ARG is not available when the container runs).
+ENV ASV_CHECKPOINT=${ASV_CHECKPOINT} \
+    ASV_MODEL_NAME=${ASV_MODEL_NAME} \
+    ASV_MODEL_CONFIG=${ASV_MODEL_CONFIG} \
+    ASV_BATCH_SIZE=${ASV_BATCH_SIZE} \
+    ASV_NUM_SAMPLES=${ASV_NUM_SAMPLES} \
+    ASV_GPU_ID=${ASV_GPU_ID} \
+    ASV_SEED=${ASV_SEED} \
+    ASV_TORCH_REFERENCE_DEVICE=${ASV_TORCH_REFERENCE_DEVICE} \
+    ASV_WORKSPACE_GIB=${ASV_WORKSPACE_GIB} \
+    ASV_BUILDER_OPT_LEVEL=${ASV_BUILDER_OPT_LEVEL} \
+    ASV_MAX_AUX_STREAMS=${ASV_MAX_AUX_STREAMS}
+
+WORKDIR /opt/asv
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir uv
+# NGC ships importable TensorRT under /usr/local/lib/python3.12/dist-packages; PyPI `tensorrt`
+# sdists do not yield a working `tensorrt_bindings` under uv. System-site-packages keeps the
+# image-provided bindings while `uv sync` still installs locked torch/asv deps into the venv.
+RUN uv venv --system-site-packages "${VIRTUAL_ENV}"
+
+# Install locked deps into the venv (`--frozen` = versions from uv.lock only). Base image Torch
+# lives on system Python; PATH uses /opt/venv, so the venv must contain torch et al.
+# uv still needs pyproject.toml + README.md on disk for the project layout; the lock is what pins.
+COPY uv.lock pyproject.toml README.md /opt/asv/
+COPY asv /opt/asv/asv
+RUN uv sync --frozen --no-dev --active
+RUN uv pip install --python "${VIRTUAL_ENV}/bin/python" onnxruntime-gpu safetensors
+RUN "${VIRTUAL_ENV}/bin/python" -c "import tensorrt as trt; assert trt.__version__"
+
+COPY benchmarking/benchmark_onnx_speed.py /opt/asv/benchmarking/benchmark_onnx_speed.py
+COPY benchmarking/checkpoint_loading.py /opt/asv/benchmarking/checkpoint_loading.py
+COPY benchmarking/export_checkpoint_to_tensorrt.py /opt/asv/benchmarking/export_checkpoint_to_tensorrt.py
+COPY benchmarking/export_redimnet2_to_tensorrt.py /opt/asv/benchmarking/export_redimnet2_to_tensorrt.py
+COPY benchmarking/trt_smoke_test.py /opt/asv/benchmarking/trt_smoke_test.py
+COPY benchmarking/onnx_conversion /opt/asv/benchmarking/onnx_conversion
+COPY configs /opt/asv/configs
+COPY ${ASV_CHECKPOINT} /opt/asv/${ASV_CHECKPOINT}
+
+# TensorRT export needs a GPU at runtime; `docker build` does not attach GPUs to RUN.
+COPY trt-runtime-entrypoint.sh /opt/asv/docker-entrypoint.sh
+
+RUN test -e "${ASV_CHECKPOINT}"
+RUN chmod +x /opt/asv/docker-entrypoint.sh
+
+# Last: changing submission scripts does not invalidate heavy layers above.
+COPY submission/reranking /opt/asv/submission/reranking
+RUN chmod +x /opt/asv/submission/reranking/run_submission_embeddings_trt_pipeline.sh
+
+ENTRYPOINT ["/opt/asv/docker-entrypoint.sh"]
+CMD ["bash"]

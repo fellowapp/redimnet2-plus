@@ -1,0 +1,37 @@
+services:
+  asv-trt-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.trt
+      args:
+        ASV_CHECKPOINT: weights
+        ASV_MODEL_NAME: b6
+        ASV_MODEL_CONFIG: configs/model/redimnet2_b6.yaml
+        ASV_BATCH_SIZE: "32"
+        ASV_NUM_SAMPLES: "96000"
+        ASV_GPU_ID: "0"
+        ASV_SEED: "1234"
+        ASV_TORCH_REFERENCE_DEVICE: cpu
+        ASV_WORKSPACE_GIB: "4.0"
+        ASV_BUILDER_OPT_LEVEL: "5"
+        ASV_MAX_AUX_STREAMS: "0"
+    image: asv-trt-runtime:latest
+    entrypoint: ["/opt/asv/docker-entrypoint.sh"]
+    gpus: all
+    working_dir: /opt/asv
+    shm_size: 8gb
+    stdin_open: true
+    tty: true
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      ASV_PREBAKE_ENGINES: "1"
+      ASV_EXPORT_SUMMARY: /opt/asv/artifacts/export_summary.json
+      ASV_DEFAULT_VARIANT: frontend_fp32_model_fp16
+      ASV_OUTPUT_DIR: /opt/asv/submission_outputs
+    volumes:
+      # Общий каталог TRT/ONNX между `compose up` и `compose run` — иначе каждый run = пустой /opt/asv/artifacts и пребейк заново.
+      - ./artifacts:/opt/asv/artifacts
+      - ./benchmarking/outputs:/opt/asv/benchmarking/outputs
+      - ./submission_outputs:/opt/asv/submission_outputs
+    command: ["bash"]

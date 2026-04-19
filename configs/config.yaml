@@ -1,0 +1,75 @@
+# Root config: compose defaults in order; `_self_` applies this file after group configs.
+defaults:
+  - model: default
+  - data: default
+  - augment: default
+  - loss: sphereface2
+  - logging: default
+  - _self_
+  - override hydra/output: asv_run
+
+# Global training knobs (override via CLI: python train.py seed=123)
+seed: 42
+max_steps: null
+output_dir: ${hydra:runtime.output_dir}
+
+optim:
+  name: adamw
+  lr: 0.0003
+  final_lr: ${optim.lr}
+  weight_decay: 0.01
+  beta1: 0.9
+  beta2: 0.999
+  eps: 1.0e-8
+
+train:
+  epochs: 30
+  auto_num_classes: false
+  log_every_steps: 1
+  # Optional model-only init for a new training stage. Unlike resume_from_checkpoint,
+  # this does not restore optimizer/scheduler/step state.
+  init_weights: null
+  # full = load all matching weights; encoder_only = encoder only;
+  # encoder_bridge = encoder + bridge.
+  init_mode: full
+  torch_compile: true
+  torch_compile_mode: default
+  git_commit_hash: ""
+  grad_accum_steps: 1
+  mixed_precision: bf16
+  expect_fsdp: true
+  max_grad_norm: 5.0
+  save_every_epochs: 1
+  # Same Hydra run as logs, config snapshot, and validation_metrics.jsonl (${output_dir}).
+  checkpoint_dir: ${output_dir}/checkpoints
+  # Optional resume: empty/null = train from scratch. Set to a checkpoint directory
+  # produced by save_state (e.g. .../epoch_0003_step_00050000) or the literal "latest"
+  # to read train.checkpoint_dir/latest.json (same Hydra output_dir only).
+  resume_from_checkpoint: null
+  # After load_state, assert weights differ from pre-load (catches wrong path / no-op load).
+  verify_checkpoint_load: true
+  fallback_on_decode_error: true
+
+validation:
+  enabled: false
+  data_root: ""
+  trial_files: []
+  batch_size: 128
+  num_workers: 4
+  pin_memory: ${data.pin_memory}
+  prefetch_factor: ${data.prefetch_factor}
+  trim_num_samples: ${data.trim_num_samples}
+  run_before_first_epoch: false
+  every_n_steps: 0
+
+# Trial-audio variant trees (e.g. outputs of scripts/build_voxceleb_trial_audio_variants.py).
+# When enabled, embeddings + pooled EER run on each subdirectory before the primary
+# validation (same schedule). Logged as ``val/variants/eer_<subdir_name>`` (one scalar per
+# variant). JSONL uses tags ``<step_tag>__variant_val`` then ``<step_tag>__primary_val``.
+# Uses the same batch/workers/trim as ``validation``. Trial files: if ``trial_files`` is
+# empty, only paths in ``validation.trial_files`` whose stem ends with ``_o`` are used.
+variant_validation:
+  enabled: false
+  scan_root: ""
+  roots: []
+  trial_files: []

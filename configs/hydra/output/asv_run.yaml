@@ -1,0 +1,8 @@
+# @package hydra
+# outputs/<MLOP_RUN>/<date>/<time>/ — set MLOP_RUN (run.sh exports it from MLOP_RUN_NAME).
+# Use path-safe run names (no slashes). Fallback default if unset: asv_run.
+run:
+  dir: outputs/${oc.env:MLOP_RUN,asv_run}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+sweep:
+  dir: multirun/${oc.env:MLOP_RUN,asv_run}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  subdir: ${hydra.job.num}
