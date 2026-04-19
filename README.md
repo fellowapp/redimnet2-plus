@@ -9,9 +9,14 @@
 
 ## Быстрый запуск eval
 
-В этом репозитории запуск оценки через Docker сделан вокруг двух сервисов:
-- `submission` для профиля `cuda13`
-- `submission-cu129` для профиля `cuda129`
+В этом репозитории запуск оценки через Docker по умолчанию строится на сервисе `submission-cu129` (профиль `cuda129`, CUDA 12.9).
+
+<details>
+<summary>Альтернатива: профиль CUDA 13</summary>
+
+Также можно использовать сервис `submission` из `docker-compose.submission.yml` (те же монтирования `weights`/`outputs` по умолчанию, другой базовый образ под CUDA 13; см. команды во вложенных блоках ниже).
+
+</details>
 
 Что зафиксировано в контейнере:
 - `./weights` на хосте монтируется в `/workspace/weights`
@@ -30,27 +35,9 @@
 
 ### Команда сборки
 
-#### `cuda13`
+#### `cuda12.9` (`cuda129`)
 
-Эта команда собирает image и проверяет, что внутри контейнера видны примонтированные `weights` и `outputs`:
-
-```bash
-docker compose -f docker-compose.submission.yml run --rm --build \
-  --entrypoint /bin/bash submission -lc \
-  "ls -ld /workspace/weights /workspace/outputs"
-```
-
-Что делает команда:
-- `--build` пересобирает image перед запуском
-- `--entrypoint /bin/bash` временно отключает обычный entrypoint инференса
-- `submission -lc "ls -ld ..."` запускает короткую проверку внутри контейнера
-- `--rm` удаляет временный контейнер после завершения
-
-Если команда отработала без ошибки, можно запускать eval.
-
-#### `cuda129`
-
-Эта команда делает ту же проверку для отдельного профиля `cuda129`:
+Команда собирает image и проверяет, что внутри контейнера видны примонтированные `weights` и `outputs`:
 
 ```bash
 docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
@@ -58,33 +45,32 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
   "ls -ld /workspace/weights /workspace/outputs"
 ```
 
-### Команда запуска оценки
+Что делает команда:
+- `--build` пересобирает image перед запуском
+- `--entrypoint /bin/bash` временно отключает обычный entrypoint инференса
+- `submission-cu129 -lc "ls -ld ..."` запускает короткую проверку внутри контейнера
+- `--rm` удаляет временный контейнер после завершения
 
-#### `cuda13`
+Если команда отработала без ошибки, можно запускать eval.
 
-Это команда для запуска оценки:
+<details>
+<summary>Профиль CUDA 13 (`submission`)</summary>
+
+То же самое для `docker-compose.submission.yml`:
 
 ```bash
 docker compose -f docker-compose.submission.yml run --rm --build \
-  -v /home/kirill/mnt/ssd_1tb_1/kryp/test_public:/data/test_public:ro submission \
-  --audio-root /data/test_public \
-  --k 10 \
-  --num-workers 8 \
-  --gpu-model-instances 3
+  --entrypoint /bin/bash submission -lc \
+  "ls -ld /workspace/weights /workspace/outputs"
 ```
 
-Важное правило: путь в `--audio-root` должен совпадать с путем внутри контейнера, который указан во флаге `-v`.
+</details>
 
-Пример:
-- на хосте: `/home/kirill/mnt/ssd_1tb_1/kryp/test_public`
-- внутри контейнера: `/data/test_public`
-- значит в аргументе надо передать `--audio-root /data/test_public`
+### Команда запуска оценки
 
-Если image уже собран и код не менялся, `--build` в команде оценки можно убрать.
+#### `cuda12.9` (`cuda129`)
 
-#### `cuda129`
-
-Аналогичная команда для профиля `cuda129`:
+Команда для запуска оценки:
 
 ```bash
 docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
@@ -95,7 +81,35 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
   --gpu-model-instances 3
 ```
 
-Для `cuda129` действует то же правило: путь в `--audio-root` должен совпадать с путем внутри контейнера, который указан во флаге `-v`.
+Важное правило: путь в `--audio-root` должен совпадать с путем внутри контейнера, который указан во флаге `-v`.
+
+Пример для `cuda129`:
+- на хосте: `/home/kirill/mnt/ssd_1tb_1/kryp/test_public`
+- внутри контейнера: `/workspace/inference_audio`
+- значит в аргументе надо передать `--audio-root /workspace/inference_audio`
+
+Если image уже собран и код не менялся, `--build` в команде оценки можно убрать.
+
+<details>
+<summary>Профиль CUDA 13 (`submission`)</summary>
+
+Аналогичная команда для `docker-compose.submission.yml`:
+
+```bash
+docker compose -f docker-compose.submission.yml run --rm --build \
+  -v /home/kirill/mnt/ssd_1tb_1/kryp/test_public:/data/test_public:ro submission \
+  --audio-root /data/test_public \
+  --k 10 \
+  --num-workers 8 \
+  --gpu-model-instances 3
+```
+
+То же правило про `--audio-root` и `-v`. Пример:
+- на хосте: `/home/kirill/mnt/ssd_1tb_1/kryp/test_public`
+- внутри контейнера: `/data/test_public`
+- аргумент: `--audio-root /data/test_public`
+
+</details>
 
 ### Где лежит результат
 
@@ -111,7 +125,7 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
 /workspace/outputs/output.csv
 ```
 
-**Пути к аудио в CSV.** В колонке `filepath` (и в списках соседей) сохраняется строка вида **имя корневой папки из `--audio-root` в контейнере** плюс **путь к файлу относительно этой папки**, через `/`. Имя берётся как последний сегмент пути ВНУТРИ КОНТЕЙНЕРА `--audio-root` (например, для `/data/test_public` это `test_public`). Дальше идёт полный относительный путь к файлу внутри этого каталога, например `test_public/subdir/track.wav`. Абсолютный путь вроде `/data/test_public/...` в CSV не пишется.
+**Пути к аудио в CSV.** В колонке `filepath` (и в списках соседей) сохраняется строка вида **имя корневой папки из `--audio-root` в контейнере** плюс **путь к файлу относительно этой папки**, через `/`. Имя берётся как последний сегмент пути ВНУТРИ КОНТЕЙНЕРА `--audio-root` (например, для `/workspace/inference_audio` это `inference_audio`, для `/data/test_public` — `test_public`). Дальше идёт полный относительный путь к файлу внутри этого каталога, например `inference_audio/subdir/track.wav`. Абсолютный путь к корню аудио в CSV не пишется.
 
 ### Аргументы команды запуска
 
@@ -119,7 +133,7 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
 
 #### Аргументы `docker compose run`
 
-Это аргументы уровня Docker, они идут до имени сервиса `submission`.
+Это аргументы уровня Docker, они идут до имени сервиса (`submission-cu129` или `submission`, в зависимости от compose-файла).
 
 - `--rm`  
   Удалить временный контейнер после завершения.
@@ -130,15 +144,17 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
 - `-v HOST_PATH:CONTAINER_PATH:ro`  
   Примонтировать папку с аудио в контейнер в режиме read-only.
 
-Пример:
+Пример для `docker-compose.submission.cuda129.yml`:
 
 ```bash
--v /abs/path/to/audio:/data/test_public:ro
+-v /abs/path/to/audio:/workspace/inference_audio:ro
 ```
+
+Для `docker-compose.submission.yml` (CUDA 13) внутри контейнера часто используют, например, `/data/test_public` — см. спойлер в секции запуска оценки.
 
 #### Аргументы `run_submission_unified.py`
 
-Это аргументы самого скрипта. Они идут после имени сервиса `submission`.
+Это аргументы самого скрипта. Они идут после имени сервиса (`submission-cu129` или `submission`).
 
 - `--audio-root PATH`  
   Обязательный аргумент. Корень аудио внутри контейнера. Должен совпадать с путем из `-v`.
@@ -240,9 +256,9 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
 
 ```bash
 # 1. Быстрый eval через Docker (см. секцию выше / docs/EVALUATION.md)
-docker compose -f docker-compose.submission.yml run --rm --build \
-  -v /path/to/audio:/data/audio:ro submission \
-  --audio-root /data/audio
+docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
+  -v /path/to/audio:/workspace/inference_audio:ro submission-cu129 \
+  --audio-root /workspace/inference_audio
 
 # 2. Собрать окружение (см. docs/INSTALLATION.md)
 conda create -n asv python=3.10 -y && conda activate asv
