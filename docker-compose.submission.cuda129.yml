@@ -1,0 +1,29 @@
+# CUDA 12.9 submission profile.
+# Example:
+#   docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
+#     -v /abs/path/to/audio:/workspace/inference_audio:ro submission-cu129 \
+#     --audio-root /workspace/inference_audio \
+#     --k 10 --num-workers 8 --gpu-model-instances 3
+
+services:
+  submission-cu129:
+    build:
+      context: .
+      dockerfile: Dockerfile.submission.cuda129
+    image: asv-submission:cu129
+    working_dir: /workspace
+    ipc: host
+    shm_size: "2gb"
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    entrypoint: ["/usr/local/bin/submission-runtime-entrypoint.sh"]
+    volumes:
+      - type: bind
+        source: ./weights
+        target: /workspace/weights
+        read_only: true
+      - type: bind
+        source: ./outputs
+        target: /workspace/outputs

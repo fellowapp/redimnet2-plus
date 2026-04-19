@@ -1203,11 +1203,11 @@ def main() -> None:
 
     n_items = len(audio_ids)
     if int(args.candidate_pool_k) < int(args.k):
-        bumped = int(args.k) + 200
+        bumped = int(args.k) + 100
         capped = min(bumped, n_items)
         print(
             f"[info] --candidate-pool-k ({args.candidate_pool_k}) < --k ({args.k}); "
-            f"using candidate_pool_k=min(k+200, n)={capped}.",
+            f"using candidate_pool_k=min(k+100, n)={capped}.",
             flush=True,
         )
         args.candidate_pool_k = capped

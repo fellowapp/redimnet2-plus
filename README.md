@@ -9,7 +9,9 @@
 
 ## Быстрый запуск eval
 
-В этом репозитории запуск оценки через Docker сделан вокруг одного сервиса: `submission`.
+В этом репозитории запуск оценки через Docker сделан вокруг двух сервисов:
+- `submission` для профиля `cuda13`
+- `submission-cu129` для профиля `cuda129`
 
 Что зафиксировано в контейнере:
 - `./weights` на хосте монтируется в `/workspace/weights`
@@ -28,6 +30,8 @@
 
 ### Команда сборки
 
+#### `cuda13`
+
 Эта команда собирает image и проверяет, что внутри контейнера видны примонтированные `weights` и `outputs`:
 
 ```bash
@@ -44,7 +48,19 @@ docker compose -f docker-compose.submission.yml run --rm --build \
 
 Если команда отработала без ошибки, можно запускать eval.
 
+#### `cuda129`
+
+Эта команда делает ту же проверку для отдельного профиля `cuda129`:
+
+```bash
+docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
+  --entrypoint /bin/bash submission-cu129 -lc \
+  "ls -ld /workspace/weights /workspace/outputs"
+```
+
 ### Команда запуска оценки
+
+#### `cuda13`
 
 Это команда для запуска оценки:
 
@@ -65,6 +81,21 @@ docker compose -f docker-compose.submission.yml run --rm --build \
 - значит в аргументе надо передать `--audio-root /data/test_public`
 
 Если image уже собран и код не менялся, `--build` в команде оценки можно убрать.
+
+#### `cuda129`
+
+Аналогичная команда для профиля `cuda129`:
+
+```bash
+docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
+  -v /home/kirill/mnt/ssd_1tb_1/kryp/test_public:/workspace/inference_audio:ro submission-cu129 \
+  --audio-root /workspace/inference_audio \
+  --k 10 \
+  --num-workers 8 \
+  --gpu-model-instances 3
+```
+
+Для `cuda129` действует то же правило: путь в `--audio-root` должен совпадать с путем внутри контейнера, который указан во флаге `-v`.
 
 ### Где лежит результат
 

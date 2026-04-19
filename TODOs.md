@@ -47,25 +47,25 @@ Greenfield-style ASV training stack: Hydra-driven configs, Hugging Face Accelera
 - [x] Add / finalize loss function wiring
 - [x] launch training
 - [x] Robustness evaluation: baseline on full dataset; for each augmentation run a 1000-sample subset; report pooled EER on the augmented subsets
-- [ ] Audit the code in the repo
-- [ ] Add separate evaluation script
-- [ ] Add ONNX/TRT conversion
-- [ ] Add sliding-window evaluation
-- [x] ~~Add TTA~~
+- [x] Audit the code in the repo
+- [x] Add separate evaluation script
+- [x] Add ONNX/TRT conversion
+- [ ] ~~Add sliding-window evaluation~~
+- [ ] ~~Add TTA~~
 - [x] Review `pin_memory`, `persistent_workers`
 - [x] Review bf16 in dataloader configuration
 - [x] Compute spectrograms on GPU
 - [x] ~~Add hard sample dataset on validation~~
-- [ ] Add new bitrates
-- [ ] Add cosine similarity loss
-- [ ] Add scheduling of margin
+- [ ] ~~Add new bitrates~~
+- [ ] ~~Add cosine similarity loss~~
+- [x] Add scheduling of margin
 - [x] Add pooled result tracking
 - [x] Check how augmented audio sounds in the training dataset (see `scripts/preview_training_dataset_augmentations.py`)
 - [x] Research why the project needs both pyproject.toml and uv.lock
 - [x] Log EER*100 instead of classical EER
 
 ## Backlog
-- [ ] Add Wav2Vec2.0 Bert as encoder 
+- [ ] ~~Add Wav2Vec2.0 Bert as encoder ~~
 
 ## Data pipeline bottlenecks (benchmark-backed)
 

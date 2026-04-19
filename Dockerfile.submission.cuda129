@@ -1,0 +1,45 @@
+# Inference image for submission/run_submission_unified.py using the PyTorch cu129 wheel index.
+# Host still needs a recent enough NVIDIA driver and `--gpus all`.
+
+FROM nvidia/cuda:12.9.1-cudnn-runtime-ubuntu24.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy \
+    VIRTUAL_ENV=/workspace/.venv
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    libpython3.12 \
+    python3-venv \
+    python3-pip \
+    ffmpeg \
+    libsndfile1 \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3 /usr/local/bin/python && \
+    ln -sf /usr/bin/pip3 /usr/local/bin/pip
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /workspace
+
+COPY uv.cuda129.lock /workspace/uv.lock
+COPY pyproject.cuda129.toml /workspace/pyproject.toml
+COPY README.md /workspace/README.md
+COPY asv /workspace/asv
+COPY benchmarking /workspace/benchmarking
+COPY configs /workspace/configs
+COPY submission /workspace/submission
+COPY submission-runtime-entrypoint.cuda129.sh /usr/local/bin/submission-runtime-entrypoint.sh
+
+RUN uv sync --frozen --no-dev
+RUN chmod +x /usr/local/bin/submission-runtime-entrypoint.sh
+
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+RUN mkdir -p /workspace/weights /workspace/outputs /data/audio
