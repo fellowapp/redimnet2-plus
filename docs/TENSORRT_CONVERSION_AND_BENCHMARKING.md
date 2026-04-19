@@ -1,28 +1,27 @@
-# TensorRT Conversion And Benchmarking
+# Конвертация в TensorRT и бенчмаркинг
 
-This note shows how to:
+В этой заметке описано, как:
 
-1. convert a checkpoint to TensorRT with frontend in `fp32` and model in `fp16`
-2. benchmark the resulting engine with `benchmarking/benchmark_onnx_speed.py` and read speed + EER
+1. сконвертировать чекпоинт в TensorRT с фронтендом в `fp32` и моделью в `fp16`;
+2. прогнать бенчмарк получившегося engine через `benchmarking/benchmark_onnx_speed.py` и получить скорость и EER.
 
-All commands below assume you run them from the repo root in the `asv` conda environment.
+Все команды ниже предполагают запуск из корня репозитория в conda-окружении `asv`.
 
-## 1. Convert checkpoint to TensorRT
+## 1. Конвертация чекпоинта в TensorRT
 
-Checkpoint used in the examples:
+Чекпоинт в примерах:
 
-- checkpoint dir: `outputs/FINAL_LMFT/epoch_0005_step_00014800`
-- weights file resolved from that dir: `outputs/FINAL_LMFT/epoch_0005_step_00014800/pytorch_model_fsdp.bin`
-- model config: `configs/model/redimnet2_b6.yaml`
+- каталог чекпоинта: `outputs/FINAL_LMFT/epoch_0005_step_00014800`;
+- файл весов из этого каталога: `outputs/FINAL_LMFT/epoch_0005_step_00014800/pytorch_model_fsdp.bin`;
+- конфиг модели: `configs/model/redimnet2_b6.yaml`.
 
-### Build both variants at once
+### Сборка обоих вариантов за один раз
 
-This helper builds:
+Этот скрипт собирает:
 
-- frontend `fp32` + model `fp16`
+- фронтенд `fp32` + модель `fp16`.
 
-Example for batch `32`, 6-second chunks at 16 kHz (`96000` samples):
-
+Пример для батча `32`, фрагментов по 6 с при 16 кГц (`96000` сэмплов):
 
 ```bash
 
@@ -41,17 +40,17 @@ python benchmarking/export_redimnet2_to_tensorrt.py \
   --report_json "benchmarking/outputs/redimnet2_b6_fp16_frontendfp32_bs32_s96000.report.json"
 ```
 
-Notes:
+Примечания:
 
-- `--engine_precision fp16` enables TensorRT FP16 build
-- `--export_dtype fp16` exports the model body in FP16
-- frontend layers are forced to FP32 by the exporter
+- `--engine_precision fp16` включает сборку TensorRT в FP16;
+- `--export_dtype fp16` экспортирует тело модели в FP16;
+- слои фронтенда экспортером принудительно остаются в FP32.
 
-## 2. Benchmark TensorRT engine and get speed + EER
+## 2. Бенчмарк TensorRT engine: скорость и EER
 
-### Run benchmark on one VoxCeleb trial file
+### Запуск бенчмарка на одном trial-файле VoxCeleb
 
-Example:
+Пример:
 
 ```bash
 python benchmarking/benchmark_onnx_speed.py \
@@ -69,6 +68,6 @@ python benchmarking/benchmark_onnx_speed.py \
   --report_json "benchmarking/outputs/benchmark_fp16_frontendfp32_bs32_pooled_hard.json"
 ```
 
-This adds an extra setup in the report:
+В отчёт добавляется дополнительная секция:
 
 - `verification.setups.voxceleb1_o_hard.eer`
