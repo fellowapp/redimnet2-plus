@@ -461,7 +461,7 @@ def main() -> None:
     parser.add_argument("--w-hub", type=float, default=0.3)
     parser.add_argument("--community-min", type=int, default=2)
     parser.add_argument("--community-max", type=int, default=50)
-    parser.add_argument("--num-workers", type=int, default=8)
+    parser.add_argument("--num-workers", type=int, default=16)
     parser.add_argument("--gpu-model-instances", type=int, default=3)
     parser.add_argument("--sample-rate", type=int, default=16000)
     parser.add_argument("--max-duration-sec", type=float, default=DEFAULT_MAX_DURATION_SEC)
