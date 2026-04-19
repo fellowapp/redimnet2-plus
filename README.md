@@ -160,7 +160,7 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
   По умолчанию: `10`
 
 - `--gpu-model-instances INT`  
-  Сколько копий модели держать на GPU параллельно.  
+  Сколько копий модели держать на GPU параллельно.  ТАК КАК МЫ ИСПОЛЬЗУЕМ БАТЧ РАВНЫЙ ОДНОМУ, 3 ИНСТАНСА ЭТО ОПТИМАЛЬНОЕ РЕШЕНИЕ, КОТОРОЕ МЫ ПРЕДЛАГАЕМ. ПОЖАЛУЙСТА, НЕ МЕНЯЙТЕ ЭТОТ ПАРАМЕТР.
   По умолчанию: `3`
 
 - `--num-workers INT`  
@@ -220,38 +220,9 @@ docker compose -f docker-compose.submission.cuda129.yml run --rm --build \
 
 </details>
 
-### Что важно знать
-
-- `candidate_pool_k` больше не передается отдельным аргументом.
-- Внутри скрипта он всегда вычисляется автоматически как `k + 200`.
-- `rerank_cpu_workers` больше не передается отдельным аргументом.
-- Для decode и rerank теперь используется один параметр: `--num-workers`.
-
-### Минимальный пример
-
-```bash
-docker compose -f docker-compose.submission.yml run --rm \
-  -v /abs/path/to/audio:/data/audio:ro submission \
-  --audio-root /data/audio
-```
-
-### Пример с дополнительными параметрами
-
-```bash
-docker compose -f docker-compose.submission.yml run --rm \
-  -v /abs/path/to/audio:/data/audio:ro submission \
-  --audio-root /data/audio \
-  --k 20 \
-  --num-workers 8 \
-  --gpu-model-instances 3 \
-  --mean-steps 50 \
-  --n-iter 4 \
-  --output-csv /workspace/outputs/custom_output.csv
-```
-
 ## Документация
 
-Минимальный набор документов, чтобы понять проект от установки до инференса:
+Минимальный набор документаций, чтобы понять проект от установки до инференса:
 
 | Документ | Про что |
 |----------|---------|
