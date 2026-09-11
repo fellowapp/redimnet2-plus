@@ -10,6 +10,7 @@ Kirill Borodin<sup>1,2,3</sup>, Vasiliy Kudryavtsev<sup>1,2,3</sup>, Grach Mkrch
 |---|---|
 | Paper (report) | [report.pdf](report.pdf) |
 | Slides | [ReDimNet2+.pptx](ReDimNet2+.pptx) |
+| Model weights | [huggingface.co/lab260/redimnet2-plus](https://huggingface.co/lab260/redimnet2-plus) |
 
 ## Abstract
 
@@ -90,7 +91,7 @@ Running it requires a GPU and a working Docker install with NVIDIA support.
 ### Preparation
 
 Before running, make sure that:
-- weights are in `weights/`
+- weights are in `weights/` (the checkpoint `pytorch_model_fsdp.bin` already ships in this repo; it's also published at [huggingface.co/lab260/redimnet2-plus](https://huggingface.co/lab260/redimnet2-plus) and can be fetched with `hf download lab260/redimnet2-plus pytorch_model_fsdp.bin --local-dir weights`)
 - the `outputs/` folder exists
 - audio is in a separate directory on the host, e.g. `/home/kirill/mnt/ssd_1tb_1/kryp/test_public`
 
