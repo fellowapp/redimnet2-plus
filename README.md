@@ -8,7 +8,6 @@ Kirill Borodin<sup>1,2,3</sup>, Vasiliy Kudryavtsev<sup>1,2,3</sup>, Grach Mkrch
 
 | Material | Link |
 |---|---|
-| Paper (report) | [report.pdf](report.pdf) |
 | Slides | [ReDimNet2+.pptx](ReDimNet2+.pptx) |
 | Model weights | [huggingface.co/lab260/redimnet2-plus](https://huggingface.co/lab260/redimnet2-plus) |
 
@@ -63,7 +62,7 @@ For reference, the *published* full-utterance numbers (different protocol, not d
 
 Applied to the final ReDimNet2+ LMFT model, the full reranking pipeline raises VoxBlink2 Pr@k from 0.7413 to 0.7687 (paper Table 4).
 
-See [`report.pdf`](report.pdf) for the full paper, including the data/domain-mismatch analysis, all ablations, and limitations.
+The full paper covers the data/domain-mismatch analysis, all ablations, and limitations in more detail; it will be linked here once available.
 
 ---
 
