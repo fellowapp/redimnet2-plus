@@ -1,28 +1,28 @@
-# Docker (TensorRT) и оценка
+# Docker (TensorRT) and evaluation
 
-Рабочая директория в контейнере: **`/opt/asv`**.
-
----
-
-**GPU НУЖЕН ВСЕГДА** (в `docker-compose.trt.yml` задано `gpus: all`): без видеокарты этот образ не имеет смысла — и пребейк TensorRT, и эмбеддинги, и smoke-тест идут на GPU.
-
-**ПРИ ПЕРВОМ ЗАПУСКЕ КОНТЕЙНЕРА ENTRYPOINT ДОЛГО СОБИРАЕТ TENSORRT-ДВИЖОК: ЭКСПОРТ ONNX, КОМПИЛЯЦИЯ ПЛАНА — ЭТО МОЖЕТ ЗАНЯТЬ МНОГО МИНУТ. В ЭТО ВРЕМЯ GPU ЗАНЯТ — ТАК РАБОТАЕТ TENSORRT. ДОЖДИТЕСЬ ОКОНЧАНИЯ ЛОГОВ, ПОКА НЕ ЗАПУСКАТЕ ПАЙПЛАЙН ОЦЕНКИ.**
-
-Папка **`./artifacts`** на хосте примонтирована в **`/opt/asv/artifacts`**: туда пишется экспорт TensorRT (`export_summary.json`, `.plan` и т.п.).
+Working directory inside the container: **`/opt/asv`**.
 
 ---
 
-## Быстрый старт
+**A GPU IS ALWAYS REQUIRED** (`docker-compose.trt.yml` sets `gpus: all`): without a GPU this image is pointless — TensorRT pre-baking, embeddings, and the smoke test all run on the GPU.
 
-1. Веса лежат в **`weights/`** в корне репозитория (в `docker-compose.trt.yml` зафиксировано `ASV_CHECKPOINT: weights`).
+**ON THE FIRST CONTAINER START, THE ENTRYPOINT SPENDS A LONG TIME BUILDING THE TENSORRT ENGINE: ONNX EXPORT, PLAN COMPILATION — THIS CAN TAKE MANY MINUTES. DURING THIS TIME THE GPU IS BUSY — THAT'S HOW TENSORRT WORKS. WAIT FOR THE LOGS TO FINISH BEFORE STARTING THE EVALUATION PIPELINE.**
 
-2. Собрать образ и поднять контейнер (одна команда):
+The **`./artifacts`** folder on the host is mounted at **`/opt/asv/artifacts`**: this is where the TensorRT export is written (`export_summary.json`, `.plan`, etc.).
+
+---
+
+## Quick start
+
+1. Weights live in **`weights/`** at the repository root (`docker-compose.trt.yml` has **`ASV_CHECKPOINT: weights`** fixed).
+
+2. Build the image and bring up the container (one command):
 
 ```bash
 docker compose up --build asv-trt-runtime
 ```
 
-Когда **TensorRT-движок и smoke-тест** успешно завершатся, в логах контейнера будет что-то в таком духе (имя `.plan` зависит от чекпоинта и варианта):
+Once the **TensorRT engine build and smoke test** finish successfully, the container logs will show something like this (the `.plan` name depends on the checkpoint and variant):
 
 ```text
 Wrote export summary to /opt/asv/artifacts/export_summary.json
@@ -38,50 +38,50 @@ Wrote export summary to /opt/asv/artifacts/export_summary.json
 }
 ```
 
-Строка **`Wrote export summary to .../export_summary.json`** и JSON smoke-теста с **`engine_path`** / **`batch_size`** / **`num_samples`** — признак, что пребейк прошёл и можно запускать пайплайн оценки.
+The line **`Wrote export summary to .../export_summary.json`** and the smoke-test JSON with **`engine_path`** / **`batch_size`** / **`num_samples`** indicate that the pre-bake succeeded and you can start the evaluation pipeline.
 
-3. **Смонтировать папку с аудио** и запустить скрипт одной командой — флаг **`-v` на хосте:путь внутри контейнера** (чтение только — `:ro`):
+3. **Mount the audio folder** and run the script with a single command — the **`-v` flag takes host:path-inside-container** (read-only — `:ro`):
 
 ```bash
 docker compose run --rm \
-  -v /абсолютный/путь/к/аудио:/data/audio:ro \
+  -v /absolute/path/to/audio:/data/audio:ro \
   asv-trt-runtime \
   /opt/asv/submission/reranking/run_submission_embeddings_trt_pipeline.sh \
   --audio-dir /data/audio
 ```
 
-Замените **`/абсолютный/путь/к/аудио`** на свой каталог. Внутри контейнера путь **`/data/audio`** может быть любым, главное — тот же в **`--audio-dir`**.
+Replace **`/absolute/path/to/audio`** with your own directory. Inside the container, the path **`/data/audio`** can be anything, as long as it matches what's passed to **`--audio-dir`**.
 
-4. Зайти в оболочку (при необходимости тоже с аудио):
+4. Enter a shell (optionally also with audio mounted):
 
 ```bash
-docker compose run --rm -v /абсолютный/путь/к/аудио:/data/audio:ro asv-trt-runtime bash
-# далее внутри:
+docker compose run --rm -v /absolute/path/to/audio:/data/audio:ro asv-trt-runtime bash
+# then, inside the container:
 # ./submission/reranking/run_submission_embeddings_trt_pipeline.sh --audio-dir /data/audio
 ```
 
-Результаты по умолчанию: **`./submission_outputs`** на хосте → **`/opt/asv/submission_outputs`** в контейнере.
+Results by default: **`./submission_outputs`** on the host → **`/opt/asv/submission_outputs`** inside the container.
 
 ---
 
-## Подробности: build-args, переменные, движок
+## Details: build args, environment variables, engine
 
-### Сборка и веса
+### Build and weights
 
-- В **`docker-compose.trt.yml`** задано **`ASV_CHECKPOINT: weights`**: в образ копируется каталог **`weights/`**. Менять build-args можно, но обычно не нужно, если веса уже в `weights/`.
-- Остальные build-args (`ASV_MODEL_NAME`, `ASV_MODEL_CONFIG`, `ASV_BATCH_SIZE`, `ASV_NUM_SAMPLES`, …) задают параметры вызова `export_checkpoint_to_tensorrt.py` при первом старте.
+- **`docker-compose.trt.yml`** sets **`ASV_CHECKPOINT: weights`**: the **`weights/`** directory is copied into the image. Build args can be changed, but this is usually unnecessary if the weights are already in `weights/`.
+- The remaining build args (`ASV_MODEL_NAME`, `ASV_MODEL_CONFIG`, `ASV_BATCH_SIZE`, `ASV_NUM_SAMPLES`, ...) set the parameters used to call `export_checkpoint_to_tensorrt.py` on first start.
 
-### Пребейк
+### Pre-bake
 
-- **`ASV_PREBAKE_ENGINES: "1"`** — при отсутствии сводки entrypoint запускает экспорт ONNX + сборку **`.plan`** и `trt_smoke_test.py`. Итог: **`/opt/asv/artifacts/export_summary.json`**.
+- **`ASV_PREBAKE_ENGINES: "1"`** — if no summary is found, the entrypoint runs an ONNX export + builds the **`.plan`** and runs `trt_smoke_test.py`. Result: **`/opt/asv/artifacts/export_summary.json`**.
 
-### Пайплайн `run_submission_embeddings_trt_pipeline.sh`
+### `run_submission_embeddings_trt_pipeline.sh` pipeline
 
-- **`--audio-dir`** — обязательный аргумент (дерево `.wav` / `.flac` / `.mp3` …).
-- Движок и размеры батча подставляются из **`ASV_EXPORT_SUMMARY`** после пребейка. **`--engine-path`** — только переопределение; без явных `--trt-batch-size` / `--trt-num-samples` можно взять из имени вида `..._bs32_s96000.plan`.
-- **`ASV_TRT_NUM_WORKERS`** / **`--num-workers`** — воркеры декода и **`--cpu-workers`** rerank.
-- Rerank внутри скрипта всегда с **`--skip-metrics`**.
+- **`--audio-dir`** — required argument (a tree of `.wav` / `.flac` / `.mp3` ...).
+- The engine and batch sizes are substituted from **`ASV_EXPORT_SUMMARY`** after the pre-bake. **`--engine-path`** is only an override; without explicit `--trt-batch-size` / `--trt-num-samples`, these can be inferred from a name like `..._bs32_s96000.plan`.
+- **`ASV_TRT_NUM_WORKERS`** / **`--num-workers`** — decode workers, and **`--cpu-workers`** for rerank.
+- Rerank inside the script is always run with **`--skip-metrics`**.
 
-### Где задано в compose
+### Where this is configured in compose
 
-- Том **`./artifacts:/opt/asv/artifacts`** (экспорт TRT), **`./submission_outputs`**, **`ASV_OUTPUT_DIR`**, **`ASV_EXPORT_SUMMARY`**, **`ASV_DEFAULT_VARIANT`**.
+- Volume **`./artifacts:/opt/asv/artifacts`** (TRT export), **`./submission_outputs`**, **`ASV_OUTPUT_DIR`**, **`ASV_EXPORT_SUMMARY`**, **`ASV_DEFAULT_VARIANT`**.

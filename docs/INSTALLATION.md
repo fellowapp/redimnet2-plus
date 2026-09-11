@@ -1,12 +1,12 @@
-# Установка
+# Installation
 
-Минимальная инструкция: поднять окружение `asv`, поставить зависимости, починить `torchcodec`/`ffmpeg` если что-то отвалилось.
+Minimal instructions: set up the `asv` environment, install dependencies, and fix `torchcodec`/`ffmpeg` if something breaks.
 
-Все команды — из корня репозитория.
+All commands are run from the repository root.
 
 ## 1. Conda + uv
 
-Окружение держим в conda, зависимости берём из `uv.lock`. `uv` ставим `pip install` внутри conda-окружения (не через `conda install`).
+We keep the environment in conda and pull dependencies from `uv.lock`. `uv` itself is installed via `pip install` inside the conda environment (not via `conda install`).
 
 ```bash
 conda create -n asv python=3.10 --no-default-packages -y
@@ -15,23 +15,23 @@ pip install uv
 UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked
 ```
 
-Важно: `UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX"` нужен всегда, иначе `uv` создаст локальный `.venv` и не тронет conda.
+Important: `UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX"` is always required — otherwise `uv` will create a local `.venv` and leave the conda environment untouched.
 
-Поставить одну библиотеку руками (не трогая `uv.lock`):
+To install a single library by hand (without touching `uv.lock`):
 
 ```bash
 uv pip install --python "$CONDA_PREFIX/bin/python" <package>
 ```
 
-## 2. Проверка
+## 2. Verification
 
 ```bash
 conda run -n asv python -c "import torch, torchaudio, torchcodec, pyarrow; print('ok')"
 ```
 
-## 3. FFmpeg + NVIDIA NPP (если torchcodec падает)
+## 3. FFmpeg + NVIDIA NPP (if torchcodec fails)
 
-Симптом: `torchcodec` ругается на `libnppicc.so.13: cannot open shared object file` или на отсутствие `libavutil.so.*`.
+Symptom: `torchcodec` complains about `libnppicc.so.13: cannot open shared object file` or a missing `libavutil.so.*`.
 
 ```bash
 conda activate asv
@@ -45,24 +45,24 @@ chmod +x "$CONDA_PREFIX/etc/conda/activate.d/asv_cuda_libs.sh" \
          "$CONDA_PREFIX/etc/conda/deactivate.d/asv_cuda_libs.sh"
 ```
 
-Активационный хук добавляет в `LD_LIBRARY_PATH` пути к `torch/lib` и `nvidia/*/lib` внутри conda.
+The activation hook adds the paths to `torch/lib` and `nvidia/*/lib` inside conda to `LD_LIBRARY_PATH`.
 
-Быстрая проверка:
+Quick check:
 ```bash
 conda run -n asv python -c "import torchaudio; x,sr=torchaudio.load_with_torchcodec('/path/to/audio.wav'); print(x.shape, sr)"
 ```
 
-## 4. FFmpeg с нужными кодеками (если не хватает AMR/Speex/…)
+## 4. FFmpeg with the required codecs (if AMR/Speex/… are missing)
 
-Кодеки нужны только если в трейн-пайплайне включены codec-аугментации. Проверить набор кодеков:
+The codecs are only needed if codec augmentations are enabled in the training pipeline. Check the available codec set:
 
 ```bash
-python scripts/generate_codec_audio_variants.py <путь.wav> --output_dir ./outputs/test_codecs
-# ожидаемо: generated=17, skipped=0, failed=0
+python scripts/generate_codec_audio_variants.py <path.wav> --output_dir ./outputs/test_codecs
+# expected: generated=17, skipped=0, failed=0
 ```
 
-Если каких-то кодеков не хватает — пересобрать `ffmpeg` в префикс conda с нужными флагами (`--enable-libspeex`, `--enable-libopencore-amrnb`, `--enable-libopencore-amrwb`, `--enable-libmp3lame`). Полная инструкция — в `README.md` на верхнем уровне («Expand FFmpeg build and codec support setup»).
+If some codecs are missing, rebuild `ffmpeg` into the conda prefix with the required flags (`--enable-libspeex`, `--enable-libopencore-amrnb`, `--enable-libopencore-amrwb`, `--enable-libmp3lame`). The full instructions are in the top-level `README.md` ("Expand FFmpeg build and codec support setup").
 
-## 5. Docker (только инференс + TensorRT)
+## 5. Docker (inference + TensorRT only)
 
-Если нужен только инференс с TRT — conda-путь не нужен. См. `docs/README.md` (разделы по Docker) и `docker-compose.trt.yml`: `docker compose up --build asv-trt-runtime` собирает образ, прогревает `.plan` движок и считает эмбеддинги.
+If you only need inference with TRT, the conda path isn't required. See `docs/README.md` (Docker sections) and `docker-compose.trt.yml`: `docker compose up --build asv-trt-runtime` builds the image, warms up the `.plan` engine, and computes embeddings.

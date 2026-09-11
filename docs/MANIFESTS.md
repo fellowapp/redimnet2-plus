@@ -1,33 +1,33 @@
-# Манифесты (Parquet)
+# Manifests (Parquet)
 
-Всё, что трогает трейн — идёт через один Parquet-манифест. Это единственная точка, определяющая «что вообще видит датасет».
+Anything that touches training goes through a single Parquet manifest. It's the single source of truth defining "what the dataset actually sees."
 
-## Схема
+## Schema
 
-Файл: `asv/manifest/schema.py`. Колонки:
+File: `asv/manifest/schema.py`. Columns:
 
-| Колонка         | Тип     | Назначение                                           |
+| Column          | Type    | Purpose                                              |
 |-----------------|---------|------------------------------------------------------|
-| `audio_path`    | string  | Абсолютный путь к аудио (читает `torchcodec`)        |
-| `rel_path`      | string  | Относительный путь от корня датасета                 |
-| `speaker_id`    | string  | Метка спикера (определяет класс)                     |
-| `video_id`      | string  | ID видео/сессии (для группировки)                    |
-| `segment_id`    | string  | ID сегмента (чаще всего stem файла)                  |
-| `audio_id`      | string  | Стабильный ID сэмпла `speaker/video/segment`         |
-| `duration_sec`  | double  | Длина в секундах (опционально, может быть null)      |
+| `audio_path`    | string  | Absolute path to the audio (read via `torchcodec`)   |
+| `rel_path`      | string  | Path relative to the dataset root                    |
+| `speaker_id`    | string  | Speaker label (defines the class)                    |
+| `video_id`      | string  | Video/session ID (for grouping)                      |
+| `segment_id`    | string  | Segment ID (usually the file stem)                   |
+| `audio_id`      | string  | Stable sample ID `speaker/video/segment`              |
+| `duration_sec`  | double  | Length in seconds (optional, may be null)             |
 
-Типы — жёстко проверяются при конкатенации (`asv/manifest/concat.py`). Сжатие — zstd.
+Types are strictly checked on concatenation (`asv/manifest/concat.py`). Compression: zstd.
 
-## Сбор одного манифеста
+## Building a single manifest
 
-Скрипт `scripts/build_parquet_manifest.py` с флагом `--dataset` сканирует нужную раскладку и пишет Parquet:
+The `scripts/build_parquet_manifest.py` script with the `--dataset` flag scans the required layout and writes a Parquet file:
 
 ```bash
 # VoxCeleb2
 python scripts/build_parquet_manifest.py --dataset voxceleb2 \
   /path/to/VoxCeleb2 /path/to/output_dir
 
-# VoxCeleb1 (1251 класс)
+# VoxCeleb1 (1251 classes)
 python scripts/build_parquet_manifest.py --dataset voxceleb1 \
   /path/to/VoxCeleb1 /path/to/output_dir
 
@@ -39,36 +39,36 @@ python scripts/build_parquet_manifest.py --dataset cnceleb2 \
 python scripts/build_parquet_manifest.py --dataset kespeech \
   /path/to/KeSpeech /path/to/output_dir
 
-# Kryp (speaker-id challenge): читает train.csv
+# Kryp (speaker-id challenge): reads train.csv
 python scripts/build_parquet_manifest.py --dataset kryp \
   /path/to/Kryp /path/to/output_dir
 ```
 
-На выходе печатает:
+Output:
 ```
 Wrote .../<dataset>_manifest.parquet (N rows)
 num_classes=<K>
 ASV_NUM_CLASSES=<K>
 ```
 
-Значения `num_classes` / `ASV_NUM_CLASSES` нужны для `run.sh` (переменная `ASV_NUM_CLASSES`) и для `model.num_classes`.
+The `num_classes` / `ASV_NUM_CLASSES` values are needed for `run.sh` (the `ASV_NUM_CLASSES` variable) and for `model.num_classes`.
 
-Полный список `--dataset`: `voxceleb1`, `voxceleb2`, `cnceleb`, `cnceleb2`, `cnceleb_all`, `3dspeaker`, `kryp`, `tidy`, `kespeech`.
+Full list of `--dataset` values: `voxceleb1`, `voxceleb2`, `cnceleb`, `cnceleb2`, `cnceleb_all`, `3dspeaker`, `kryp`, `tidy`, `kespeech`.
 
-## Опции
+## Options
 
-- `--output-name NAME` — кастомное имя `.parquet` файла (по умолчанию `<dataset>_manifest.parquet`).
-- `--durations-parquet PATH` — приджойнить длительности из отдельного Parquet (колонки `path`, `duration`).
-- `--no-durations` — вообще не читать файлы длительностей (даже если по умолчанию лежит).
-- `--probe-durations` / `--no-probe-durations` — только для `--dataset kryp`: читать длительности из FLAC-хедеров (`soundfile.info`). По умолчанию включено для Kryp.
+- `--output-name NAME` — custom name for the `.parquet` file (default `<dataset>_manifest.parquet`).
+- `--durations-parquet PATH` — join durations from a separate Parquet file (columns `path`, `duration`).
+- `--no-durations` — don't read duration files at all (even if one is present by default).
+- `--probe-durations` / `--no-probe-durations` — for `--dataset kryp` only: read durations from FLAC headers (`soundfile.info`). Enabled by default for Kryp.
 
-## Длительности (зачем)
+## Durations (why they matter)
 
-Колонка `duration_sec` нужна для `codec_min_duration_sec` в `configs/data/default.yaml`: если длина файла меньше порога, кодек-ветку скипаем (короткие файлы часто не кодируются или кодируются с артефактами). Если `duration_sec` пустая — порог не работает, кодек применяется всегда.
+The `duration_sec` column is used for `codec_min_duration_sec` in `configs/data/default.yaml`: if a file's length is below the threshold, the codec branch is skipped (short files often don't encode well, or encode with artifacts). If `duration_sec` is empty, the threshold check doesn't apply and the codec is always applied.
 
-## Конкатенация нескольких манифестов
+## Concatenating multiple manifests
 
-Если хочется тренировать на нескольких датасетах сразу (VoxCeleb2 + CN-Celeb2 + …) — склейте манифесты через `scripts/concat_manifests.py`:
+If you want to train on several datasets at once (VoxCeleb2 + CN-Celeb2 + …), merge the manifests with `scripts/concat_manifests.py`:
 
 ```bash
 python scripts/concat_manifests.py \
@@ -79,37 +79,37 @@ python scripts/concat_manifests.py \
   --speaker-prefix-b "cn2_"
 ```
 
-Префиксы обязательны, если ID спикеров пересекаются (иначе скрипт ругнётся). Если пересечение — это намеренно один и тот же спикер: `--allow-speaker-overlap`.
+Prefixes are required if speaker IDs overlap between the manifests (otherwise the script will complain). If the overlap is intentional — i.e. it's genuinely the same speaker — pass `--allow-speaker-overlap`.
 
-`scripts/concat_training_manifests.py` — расширенная версия на N манифестов с теми же правилами.
+`scripts/concat_training_manifests.py` is an extended version for N manifests, with the same rules.
 
-## Отдельные длительности
+## Standalone durations
 
-`asv/manifest/durations.py` хранит helpers для маппинга полных путей в «короткие» ключи (`wav/...`, `dev/aac/...` и т.д.) — они используются при join'е с `--durations-parquet`. Если нужно собрать durations-parquet заранее:
+`asv/manifest/durations.py` holds helpers for mapping full paths to "short" keys (`wav/...`, `dev/aac/...`, etc.) — used when joining with `--durations-parquet`. If you need to build a durations-parquet file ahead of time:
 
 ```bash
-# Базовый формат: колонки (path, duration). Сборка — вручную (не поставлен готовый скрипт).
-# Примеры из asv/manifest/durations.py: *_rel_from_any_path функции показывают, какой ключ ожидается.
+# Basic format: columns (path, duration). Building it is manual (no ready-made script is provided).
+# Examples in asv/manifest/durations.py: the *_rel_from_any_path functions show what key is expected.
 ```
 
-Для быстрого обхода без отдельного парсинга: `--no-durations` (колонка останется null), либо `--probe-durations` для `--dataset kryp`.
+For a quick pass without separate parsing: use `--no-durations` (the column stays null), or `--probe-durations` for `--dataset kryp`.
 
-## Использование в трейне
+## Usage in training
 
-В `run.sh`:
+In `run.sh`:
 
 ```bash
 MANIFEST_PATH="/path/to/merged_manifest.parquet"
-ASV_NUM_CLASSES=63934     # число уникальных speaker_id
+ASV_NUM_CLASSES=63934     # number of unique speaker_id values
 ```
 
-`train.py` дальше поднимает `ParquetAudioDataset(manifest_path, ...)` (см. `asv/data/parquet_dataset.py`), который:
+`train.py` then spins up a `ParquetAudioDataset(manifest_path, ...)` (see `asv/data/parquet_dataset.py`), which:
 
-1. Индексирует `(row_group, row_index)` для O(1) доступа.
-2. Строит `speaker_id -> label` маппинг по всему манифесту (детерминированно, сортировкой).
-3. Кэширует по одному `row_group`, чтобы чтения не рандомились между файлами.
+1. Indexes `(row_group, row_index)` for O(1) access.
+2. Builds a `speaker_id -> label` mapping over the whole manifest (deterministically, via sorting).
+3. Caches one `row_group` at a time, so reads don't jump around between files.
 
-Валидировать схему руками (если сомнения):
+To validate the schema manually (if in doubt):
 ```python
 from asv.manifest.concat import validate_manifest_schema
 from pathlib import Path

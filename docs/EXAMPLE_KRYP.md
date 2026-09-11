@@ -1,30 +1,30 @@
-# Пример: трейн и submission на Kryp (1 GPU)
+# Example: training and submission on Kryp (1 GPU)
 
-Пошаговый walkthrough на одном датасете (Kryp speaker-id challenge) и одной видеокарте. Для других датасетов — см. [`DATA_PREPARATION.md`](DATA_PREPARATION.md) + [`MANIFESTS.md`](MANIFESTS.md); для multi-GPU — [`TRAINING.md`](TRAINING.md).
+A step-by-step walkthrough on a single dataset (the Kryp speaker-id challenge) and a single GPU. For other datasets, see [`DATA_PREPARATION.md`](DATA_PREPARATION.md) + [`MANIFESTS.md`](MANIFESTS.md); for multi-GPU, see [`TRAINING.md`](TRAINING.md).
 
-## 0. Что у нас есть
+## 0. What we have
 
-Пусть датасет распакован в `~/cryp_data/kryp/`:
+Assume the dataset is unpacked into `~/cryp_data/kryp/`:
 
 ```
 ~/cryp_data/kryp/
 ├── _download_mailru_public.py
 ├── _manifest_build.log
-├── kryp_train_manifest.parquet    # уже собранный манифест (опционально)
+├── kryp_train_manifest.parquet    # already-built manifest (optional)
 ├── train/
-│   └── <speaker_id>/<NNNNN>.flac  # тренировочное аудио
+│   └── <speaker_id>/<NNNNN>.flac  # training audio
 ├── train.csv                       # columns: speaker_id, filepath
 ├── train.tar.gz
 ├── test_public/
-│   └── <file>.flac                 # аудио для submission
-└── test_public.csv                 # список файлов для submission
+│   └── <file>.flac                 # audio for submission
+└── test_public.csv                 # list of files for submission
 ```
 
-Всё в 16 kHz моно FLAC.
+Everything is 16 kHz mono FLAC.
 
-## 1. Окружение
+## 1. Environment
 
-Ставится один раз, см. [`INSTALLATION.md`](INSTALLATION.md):
+Set up once, see [`INSTALLATION.md`](INSTALLATION.md):
 
 ```bash
 conda create -n asv python=3.10 --no-default-packages -y
@@ -32,16 +32,16 @@ conda activate asv
 pip install uv
 UV_PROJECT_ENVIRONMENT="$CONDA_PREFIX" uv sync --locked
 
-# для torchcodec:
+# for torchcodec:
 conda install -y ffmpeg
 uv pip install nvidia-npp
 cp activate_asv_cuda_libs.sh "$CONDA_PREFIX/etc/conda/activate.d/asv_cuda_libs.sh"
 chmod +x "$CONDA_PREFIX/etc/conda/activate.d/asv_cuda_libs.sh"
 ```
 
-## 2. Манифест
+## 2. Manifest
 
-### Если он не собран — собрать
+### If it isn't built yet — build it
 
 ```bash
 conda activate asv
@@ -53,7 +53,7 @@ python scripts/build_parquet_manifest.py \
   ~/cryp_data/kryp
 ```
 
-Скрипт читает `~/cryp_data/kryp/train.csv` (колонки `speaker_id`, `filepath`), обходит `train/<spk>/*.flac` и пишет `~/cryp_data/kryp/kryp_train_manifest.parquet`. В stdout будет:
+The script reads `~/cryp_data/kryp/train.csv` (columns `speaker_id`, `filepath`), walks `train/<spk>/*.flac`, and writes `~/cryp_data/kryp/kryp_train_manifest.parquet`. Stdout will show:
 
 ```
 Wrote .../kryp_train_manifest.parquet (N rows)
@@ -61,11 +61,11 @@ num_classes=<K>
 ASV_NUM_CLASSES=<K>
 ```
 
-Запомните `K` — это число уникальных спикеров, оно же `ASV_NUM_CLASSES`.
+Remember `K` — this is the number of unique speakers, i.e. `ASV_NUM_CLASSES`.
 
-### Если манифест уже есть
+### If the manifest already exists
 
-Можно просто прочитать число классов руками:
+You can just read the number of classes by hand:
 
 ```bash
 python -c "
@@ -78,20 +78,20 @@ print('num_classes =', len(speakers))
 "
 ```
 
-## 3. Трейн на 1 GPU
+## 3. Training on 1 GPU
 
-### Accelerate-конфиг
+### Accelerate config
 
-Уже есть: `configs/accelerate/single_gpu_bf16.yaml` (`distributed_type: NO`, 1 процесс, bf16). В отличие от FSDP-конфигов, он **не** шардит параметры — на одной GPU шардить нечего.
+Already provided: `configs/accelerate/single_gpu_bf16.yaml` (`distributed_type: NO`, 1 process, bf16). Unlike the FSDP configs, it does **not** shard parameters — on a single GPU there's nothing to shard.
 
-### run.sh — что поправить
+### run.sh — what to change
 
-Откройте `run.sh` и замените верхний блок под single-GPU:
+Open `run.sh` and replace the top block for single-GPU:
 
 ```bash
-# --- под Kryp + 1 GPU ---
+# --- for Kryp + 1 GPU ---
 MANIFEST_PATH="/home/kirill/cryp_data/kryp/kryp_train_manifest.parquet"
-ASV_NUM_CLASSES=<число_спикеров_из_шага_2>
+ASV_NUM_CLASSES=<number_of_speakers_from_step_2>
 MUSAN_PATH="/path/to/musan"        
 RIRS_PATH="/path/to/RIRS_NOISES"   
 
@@ -107,7 +107,7 @@ MAX_GRAD_NORM=20.0
 START_LR=3e-5
 FINAL_LR=5e-6
 LOG_EVERY_STEPS=1
-INIT_WEIGHTS=""                    # если хотите старт из претрейна — укажите путь
+INIT_WEIGHTS=""                    # if you want to start from a pretrained checkpoint — specify the path
 INIT_MODE="full"
 RESUME_FROM_CHECKPOINT=""
 
@@ -115,25 +115,25 @@ NUM_GPUS=1
 MIXED_PRECISION="bf16"
 ACCELERATE_CONFIG="configs/accelerate/single_gpu_bf16.yaml"
 
-# Валидация на VoxCeleb1 — не обязательна для Kryp-only трейна:
+# Validation on VoxCeleb1 — not required for Kryp-only training:
 VALIDATION_ENABLED=false
 VARIANT_VAL_ENABLED=false
 VALIDATE_BEFORE_FIRST_EPOCH=false
 ```
 
-Важно: в `configs/config.yaml` есть `train.expect_fsdp: true` — это только флаг для лога, на 1 GPU без FSDP ничего не сломает, можно оставить. Если мешает warning — добавьте в `run.sh` в блок вызова `accelerate launch` параметр `train.expect_fsdp=false`.
+Important: `configs/config.yaml` has `train.expect_fsdp: true` — this is just a logging flag, and on 1 GPU without FSDP it won't break anything, so it's fine to leave it. If the warning bothers you, add `train.expect_fsdp=false` to the `accelerate launch` invocation block in `run.sh`.
 
-Если выключаете MUSAN/RIRS (нет датасетов под рукой) — передайте пустые `MUSAN_PATH=""` и **плюс** CLI-overrides:
+If you're disabling MUSAN/RIRS (no datasets on hand), pass empty `MUSAN_PATH=""` **plus** CLI overrides:
 
 ```bash
-# добавить в команду accelerate launch:
+# add to the accelerate launch command:
 augment.waveform_levels.1.p=0.0 \
 augment.waveform_levels.2.p=0.0
 ```
 
-(это обнулит «additive_noise» и «rir» уровни в `configs/augment/default.yaml`).
+(this zeroes out the "additive_noise" and "rir" levels in `configs/augment/default.yaml`).
 
-### Запуск
+### Launch
 
 ```bash
 cd /path/to/ASV
@@ -141,16 +141,16 @@ conda activate asv
 bash run.sh
 ```
 
-`run.sh` отказывается стартовать, если есть uncommitted-изменения. Закоммитьте свои правки (или временно закомментируйте проверку в `run.sh`).
+`run.sh` refuses to start if there are uncommitted changes. Commit your edits (or temporarily comment out the check in `run.sh`).
 
-Чекпоинты пишутся в `outputs/<MLOP_RUN_NAME>/<date>/<time>/checkpoints/epoch_XXXX_step_XXXXXXXX/`. Последний фиксируется в `latest.json`.
+Checkpoints are written to `outputs/<MLOP_RUN_NAME>/<date>/<time>/checkpoints/epoch_XXXX_step_XXXXXXXX/`. The latest one is recorded in `latest.json`.
 
-## 4. Инференс на test_public: эмбеддинги
+## 4. Inference on test_public: embeddings
 
-Нужен путь к тренированному чекпоинту из шага 3, например:
+You need the path to the trained checkpoint from step 3, e.g.:
 `outputs/trainin_b6_lmft_long/2026-04-20/12-00-00/checkpoints/epoch_0004_step_00008000/`.
 
-### Вариант A — PyTorch (одна GPU, без TRT)
+### Option A — PyTorch (single GPU, no TRT)
 
 ```bash
 accelerate launch \
@@ -169,14 +169,14 @@ accelerate launch \
   --trim-num-samples 96000
 ```
 
-- `--trim-num-samples 96000` — центр-кроп до 6 секунд (совпадает с трейном). Хотите полную длину — `--trim-num-samples 0`.
-- `--audio-root` сканирует директорию рекурсивно; `test_public.csv` сам по себе не читается, нам нужен список реальных файлов — они берутся с файловой системы.
+- `--trim-num-samples 96000` — center-crop to 6 seconds (matches training). If you want full length, use `--trim-num-samples 0`.
+- `--audio-root` scans the directory recursively; `test_public.csv` itself is not read — we need the list of actual files, and those come from the filesystem.
 
-На выходе — `embeddings_test_public.pkl` со словарём `{embeddings, audio_ids, trial_rel_paths, audio_paths}` (L2-нормализованные).
+The output is `embeddings_test_public.pkl` containing a dict `{embeddings, audio_ids, trial_rel_paths, audio_paths}` (L2-normalized).
 
-### Вариант B — TensorRT (быстрее)
+### Option B — TensorRT (faster)
 
-Сначала экспорт `.plan` (см. [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md)):
+First export the `.plan` (see [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md)):
 
 ```bash
 python benchmarking/export_redimnet2_to_tensorrt.py \
@@ -191,7 +191,7 @@ python benchmarking/export_redimnet2_to_tensorrt.py \
   --report_json artifacts/kryp_b6_fp16_bs32_s96000.report.json
 ```
 
-Потом пайплайн (эмбеддинги + реранк одной командой):
+Then run the pipeline (embeddings + rerank in a single command):
 
 ```bash
 ./submission/reranking/run_submission_embeddings_trt_pipeline.sh \
@@ -204,13 +204,13 @@ python benchmarking/export_redimnet2_to_tensorrt.py \
   --neighbors-filepath-prefix test_public
 ```
 
-Скрипт сам вытащит `batch_size=32`, `num_samples=96000` из имени `.plan` и положит результат в `~/cryp_data/kryp/submission_outputs/`:
-- `embeddings_trt.pkl` — эмбеддинги
-- `embeddings_trt_mean_chain_v2.neighbors.csv` — **это и есть submission-файл**
+The script automatically extracts `batch_size=32` and `num_samples=96000` from the `.plan` filename and places the result in `~/cryp_data/kryp/submission_outputs/`:
+- `embeddings_trt.pkl` — embeddings
+- `embeddings_trt_mean_chain_v2.neighbors.csv` — **this is the submission file**
 
-## 5. Собрать submission (реранк + CSV)
+## 5. Assemble the submission (rerank + CSV)
 
-Если делали Вариант A (PyTorch), реранк надо запустить отдельно:
+If you used Option A (PyTorch), rerank needs to be run separately:
 
 ```bash
 python submission/reranking/rerank_embeddings_mean_chain_v2_fast.py \
@@ -222,15 +222,15 @@ python submission/reranking/rerank_embeddings_mean_chain_v2_fast.py \
   --skip-metrics
 ```
 
-На выходе:
-- `submission.neighbors.csv` — `filepath,neighbours` на каждый файл из `test_public/` (10 соседей в кавычках через запятую). **Это submission.**
-- `submission.metrics.json` — ничего полезного (метрик нет, только тайминг).
+Output:
+- `submission.neighbors.csv` — `filepath,neighbours` for each file in `test_public/` (10 neighbors, comma-separated, in quotes). **This is the submission.**
+- `submission.metrics.json` — nothing useful (no metrics, just timing).
 
-Колонка `filepath` будет вида `test_public/<name>.flac` — это задаёт `--neighbors-filepath-prefix test_public`. Нужен другой префикс — пропишите его.
+The `filepath` column will look like `test_public/<name>.flac` — this is set by `--neighbors-filepath-prefix test_public`. If you need a different prefix, specify it there.
 
-## 6. Проверить формат
+## 6. Check the format
 
-Submission-CSV должен выглядеть так:
+The submission CSV should look like this:
 
 ```
 filepath,neighbours
@@ -238,16 +238,16 @@ test_public/abc123.flac,"test_public/xxx.flac,test_public/yyy.flac,test_public/z
 test_public/def456.flac,"test_public/aaa.flac,..."
 ```
 
-- Одна строка на каждый файл из `test_public/`.
-- 10 соседей в поле `neighbours` через запятую, в двойных кавычках.
-- Первой строкой — заголовок `filepath,neighbours`.
+- One row per file in `test_public/`.
+- 10 neighbors in the `neighbours` field, comma-separated, in double quotes.
+- The first row is the header `filepath,neighbours`.
 
-Если формат submission-платформы строже (например, нужен другой префикс или другое число соседей) — меняйте `--neighbors-filepath-prefix` и `--k`.
+If the submission platform's format is stricter (e.g. it needs a different prefix or a different number of neighbors), adjust `--neighbors-filepath-prefix` and `--k`.
 
-## 7. Типичные вопросы
+## 7. Frequently asked questions
 
-- **OOM на трейне:** уменьшите `BATCH_PER_GPU`, увеличьте `GRAD_ACCUM_STEPS`. Для b6 на 24GB GPU комфортно 8–12 при 6-секундных чанках.
-- **OOM на инференсе:** для PyTorch — уменьшите `--batch-size`; для TRT — пересоберите `.plan` с меньшим `--batch_size`.
-- **Долгий трейн:** 4 эпохи на одной GPU — это много часов. Для быстрого смоука включите `SINGLE_BATCH_TEST=true bash run.sh` — один батч, sanity-проверка пайплайна.
-- **Трейн падает на кодек-аугментациях:** проверьте ffmpeg (`python scripts/generate_codec_audio_variants.py <file> --output_dir ./tmp`). Или выключите кодек-ветку через CLI: `data.transform_probabilities.codec_only=0.0 data.transform_probabilities.codec_then_augment=0.0` и соответственно поднимите `keep_original`/`augment_only` чтобы сумма = 1.0 (эта таблица промаркирована как эксперимент-лок в дефолтах; здесь вы её переопределяете осознанно).
-- **Валидация VoxCeleb не нужна на Kryp-трейне:** выключите через `VALIDATION_ENABLED=false` и `VARIANT_VAL_ENABLED=false` в `run.sh`.
+- **OOM during training:** reduce `BATCH_PER_GPU`, increase `GRAD_ACCUM_STEPS`. For b6 on a 24GB GPU, 8–12 is comfortable with 6-second chunks.
+- **OOM during inference:** for PyTorch, reduce `--batch-size`; for TRT, rebuild the `.plan` with a smaller `--batch_size`.
+- **Training takes a long time:** 4 epochs on a single GPU is many hours. For a quick smoke test, use `SINGLE_BATCH_TEST=true bash run.sh` — a single batch, a sanity check of the pipeline.
+- **Training fails on codec augmentations:** check ffmpeg (`python scripts/generate_codec_audio_variants.py <file> --output_dir ./tmp`). Or disable the codec branch via CLI: `data.transform_probabilities.codec_only=0.0 data.transform_probabilities.codec_then_augment=0.0`, and raise `keep_original`/`augment_only` accordingly so the sum is 1.0 (this table is marked as an experiment-lock in the defaults; here you're overriding it deliberately).
+- **VoxCeleb validation isn't needed for Kryp-only training:** disable it via `VALIDATION_ENABLED=false` and `VARIANT_VAL_ENABLED=false` in `run.sh`.

@@ -1,34 +1,34 @@
-# Оценка и инференс
+# Evaluation and Inference
 
-Два сценария:
+Two scenarios:
 
-1. **Валидация во время трейна** — VoxCeleb1 EER, запускается встроенно в цикл обучения.
-2. **Submission-инференс** — считаем эмбеддинги по директории аудио и ре-ранжируем соседей (mean-chain v2). Два бэкенда: PyTorch (Accelerate) и TensorRT.
+1. **Validation during training** — VoxCeleb1 EER, runs embedded in the training loop.
+2. **Submission inference** — compute embeddings over an audio directory and rerank neighbors (mean-chain v2). Two backends: PyTorch (Accelerate) and TensorRT.
 
-## 1. Валидация во время трейна
+## 1. Validation during training
 
-Всё ставится в `run.sh` (см. также [`TRAINING.md`](TRAINING.md) и `asv/validation/voxceleb.py`).
+Everything is configured in `run.sh` (see also [`TRAINING.md`](TRAINING.md) and `asv/validation/voxceleb.py`).
 
-- `VALIDATION_ENABLED=true` — включает.
-- `VOXCELEB_VAL_ROOT`, `VOXCELEB_TRIAL_FILES` — корень VoxCeleb и список trial-файлов.
-- `VALIDATE_EVERY_N_STEPS=N` — валидация каждые N optimizer-шагов + в конце каждой эпохи.
-- `VALIDATE_BEFORE_FIRST_EPOCH=true` — прогнать валидацию до первого шага как baseline.
+- `VALIDATION_ENABLED=true` — enables it.
+- `VOXCELEB_VAL_ROOT`, `VOXCELEB_TRIAL_FILES` — VoxCeleb root and the list of trial files.
+- `VALIDATE_EVERY_N_STEPS=N` — validate every N optimizer steps, plus at the end of every epoch.
+- `VALIDATE_BEFORE_FIRST_EPOCH=true` — run validation before the first step as a baseline.
 
-Логи:
-- `val/eer/<trial_stem>` — EER по каждому trial-файлу.
-- `val/eer/pooled` — pooled EER по всем триалам.
+Logs:
+- `val/eer/<trial_stem>` — EER for each trial file.
+- `val/eer/pooled` — pooled EER across all trials.
 
-Ещё в `validation_metrics.jsonl` (в Hydra runtime dir) — каждая строка одна валидация с тегом (`epoch_XXX_end`, `epoch_XXX_step_NNN`, …).
+Also written to `validation_metrics.jsonl` (in the Hydra runtime dir) — each line is one validation run with a tag (`epoch_XXX_end`, `epoch_XXX_step_NNN`, …).
 
-Variant-валидация (устойчивость к кодекам/аугментациям):
-- `VARIANT_VAL_ENABLED=true`, `VARIANT_VAL_SCAN_ROOT=<дирректория с поддирами>`.
-- На каждую поддиректорию — отдельный EER (`val/variants/eer_<name>`) и глобальный `val/eer/pooled_hard`.
+Variant validation (robustness to codecs/augmentations):
+- `VARIANT_VAL_ENABLED=true`, `VARIANT_VAL_SCAN_ROOT=<directory containing subdirectories>`.
+- Each subdirectory gets its own EER (`val/variants/eer_<name>`), plus a global `val/eer/pooled_hard`.
 
 ## 2. Submission — PyTorch (`run_embeddings.py`)
 
-Кастовый инференс без TRT, через Accelerate на N GPU.
+Custom inference without TRT, via Accelerate on N GPUs.
 
-Быстрый запуск — скрипт `submission/reranking/run_embeddings.sh` (поправьте пути внутри). По сути он вызывает:
+Quick start — the `submission/reranking/run_embeddings.sh` script (edit the paths inside it). Under the hood it calls:
 
 ```bash
 accelerate launch \
@@ -47,53 +47,53 @@ accelerate launch \
   --trim-num-samples 0
 ```
 
-- `--weights` — путь к чекпоинту: директория Accelerate (`epoch_*`) или отдельный файл (`.safetensors`, `.bin`, `.pt`). Скрипт сам распознаёт и снимает `module.` / `_orig_mod.` префиксы.
-- `--trim-num-samples 0` — использовать полную длину файла (без обрезки). Для fixed-length используйте, например, `96000`.
-- `--audio-root <dir>` вместо `--manifest-path` — рекурсивно сканирует директорию и считает эмбеддинги по всем аудио.
+- `--weights` — path to the checkpoint: an Accelerate directory (`epoch_*`) or a single file (`.safetensors`, `.bin`, `.pt`). The script auto-detects it and strips `module.` / `_orig_mod.` prefixes.
+- `--trim-num-samples 0` — use the full length of the file (no trimming). For a fixed length, use e.g. `96000`.
+- `--audio-root <dir>` instead of `--manifest-path` — recursively scans the directory and computes embeddings for all audio files.
 
-На выходе — pickle `{"embeddings": np.ndarray [N, D], "audio_ids": list[str], "trial_rel_paths": list[str], "audio_paths": list[str]}`.
+Output — a pickle `{"embeddings": np.ndarray [N, D], "audio_ids": list[str], "trial_rel_paths": list[str], "audio_paths": list[str]}`.
 
 ## 3. Submission — TensorRT (`run_embeddings_trt.py`)
 
-Путь быстрее и детерминированнее. Использует готовый `.plan` движок (см. [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md) про экспорт).
+Faster and more deterministic path. Uses a pre-built `.plan` engine (see [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md) for export details).
 
-Запуск одной командой через оболочку (`submission/reranking/run_submission_embeddings_trt_pipeline.sh`):
+Run with a single shell command (`submission/reranking/run_submission_embeddings_trt_pipeline.sh`):
 
 ```bash
 ./submission/reranking/run_submission_embeddings_trt_pipeline.sh \
   --audio-dir /path/to/audio
 ```
 
-Обязательно: `--audio-dir <dir>` — директория с аудио (flac/wav/mp3/…).
+Required: `--audio-dir <dir>` — directory with audio (flac/wav/mp3/…).
 
-Необязательно:
-- `--engine-path <plan>` — напрямую указать `.plan`; batch/num_samples можно прочитать из имени вида `..._bs32_s96000.plan` автоматически (или передать `--trt-batch-size`, `--trt-num-samples`).
-- Либо `--summary-json` / `--variant <key>` — брать движок из `export_summary.json` (по умолчанию `artifacts/export_summary.json` + вариант `frontend_fp32_model_fp16`).
-- `--output-dir <dir>` — куда класть pickle и CSV (по умолчанию `submission_pipeline/`).
-- `--num-workers N` — воркеры декода (они же `--cpu-workers` у rerank).
-- `--k N` — сколько соседей сохранить (по умолчанию `10`).
+Optional:
+- `--engine-path <plan>` — point directly at the `.plan`; batch/num_samples can be read automatically from a filename like `..._bs32_s96000.plan` (or pass `--trt-batch-size`, `--trt-num-samples`).
+- Or `--summary-json` / `--variant <key>` — take the engine from `export_summary.json` (default `artifacts/export_summary.json` + the `frontend_fp32_model_fp16` variant).
+- `--output-dir <dir>` — where to place the pickle and CSV (default `submission_pipeline/`).
+- `--num-workers N` — decode workers (same as `--cpu-workers` for rerank).
+- `--k N` — how many neighbors to keep (default `10`).
 
-Что скрипт делает:
-1. `run_embeddings_trt.py` → эмбеддинги в `<output-dir>/embeddings_trt.pkl`.
-2. `rerank_embeddings_mean_chain_v2_fast.py` → ре-ранг соседей в CSV с суффиксом `.neighbors.csv`.
+What the script does:
+1. `run_embeddings_trt.py` → embeddings into `<output-dir>/embeddings_trt.pkl`.
+2. `rerank_embeddings_mean_chain_v2_fast.py` → reranks neighbors into a CSV with the `.neighbors.csv` suffix.
 
-Для Docker-сценария (prebake TRT-движок внутри контейнера + монтирование аудио) — см. `docs/README.md` «Quick start» и `docker-compose.trt.yml`.
+For the Docker scenario (pre-baking the TRT engine inside the container + mounting audio) — see `docs/README.md` "Quick start" and `docker-compose.trt.yml`.
 
-## 4. Ре-ранжирование соседей
+## 4. Neighbor reranking
 
-`submission/reranking/rerank_embeddings_mean_chain_v2_fast.py` — mean-chain v2 с графовым ре-ранком. Входы:
-- `embeddings.pkl` с ключами `embeddings`, `audio_ids`.
-- `--k <N>` — сколько соседей сохранить на файл.
-- `--output-prefix <prefix>` — куда класть результат (будут суффиксы `.neighbors.csv`, `.metrics.json` и т.п.).
-- `--cpu-workers <N>` — параллелизм на CPU.
-- `--device cuda|cpu` — для основных тензорных операций.
-- `--skip-metrics` — не считать метрики, просто выдать топ-K.
+`submission/reranking/rerank_embeddings_mean_chain_v2_fast.py` — mean-chain v2 with graph-based reranking. Inputs:
+- `embeddings.pkl` with keys `embeddings`, `audio_ids`.
+- `--k <N>` — how many neighbors to keep per file.
+- `--output-prefix <prefix>` — where to place the result (suffixes `.neighbors.csv`, `.metrics.json`, etc. will be appended).
+- `--cpu-workers <N>` — CPU parallelism.
+- `--device cuda|cpu` — for the main tensor operations.
+- `--skip-metrics` — skip metric computation, just output the top-K.
 
-CSV соседей имеет колонки `filepath,neighbours`, где `neighbours` — 10 (или сколько указали) относительных путей через запятую в кавычках.
+The neighbors CSV has columns `filepath,neighbours`, where `neighbours` is 10 (or however many were specified) comma-separated relative paths in quotes.
 
-## 5. TensorRT: экспорт и прогрев
+## 5. TensorRT: export and warm-up
 
-Короткая выжимка (полная — в [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md)):
+Short summary (full version in [`TENSORRT_CONVERSION_AND_BENCHMARKING.md`](TENSORRT_CONVERSION_AND_BENCHMARKING.md)):
 
 ```bash
 python benchmarking/export_redimnet2_to_tensorrt.py \
@@ -108,13 +108,13 @@ python benchmarking/export_redimnet2_to_tensorrt.py \
   --report_json benchmarking/outputs/...report.json
 ```
 
-Frontend (mel) всегда fp32, тело модели — fp16 / fp32 по выбору. Батч и `num_samples` запекаются в `.plan` и потом подсасываются из имени файла.
+The frontend (mel) is always fp32; the model body is fp16 / fp32 by choice. Batch size and `num_samples` are baked into the `.plan` and later picked up from the filename.
 
-Bench на VoxCeleb trial'ах — `benchmarking/benchmark_onnx_speed.py` (пример запуска в том же файле `TENSORRT_CONVERSION_AND_BENCHMARKING.md`).
+Benchmarking on VoxCeleb trials — `benchmarking/benchmark_onnx_speed.py` (an example invocation is in the same file, `TENSORRT_CONVERSION_AND_BENCHMARKING.md`).
 
-## 6. Частые грабли
+## 6. Common pitfalls
 
-- **`run.sh` отказывается стартовать** — не закоммитил изменения: `git status --porcelain` не пустой.
-- **OOM в submission-инференсе** — уменьшите `--batch-size`, уберите `mixed_precision` из Accelerate или включите его (`bf16`), либо переключитесь на TRT-путь.
-- **TRT: per-batch corruption после первой группы файлов** — это был баг sync между CUDA-стримами (fix уже в коде, см. коммит `98d0784`). Если собираете движок в другом окружении, проверьте `benchmarking/benchmark_onnx_speed.py::TrtRunner.submit` — там есть `self.stream.wait_stream(torch.cuda.default_stream(...))`.
-- **Resume не обновляет веса** — `train.verify_checkpoint_load=true` упадёт на старте. Скорее всего неверный путь к чекпоинту или кривой `latest.json`.
+- **`run.sh` refuses to start** — uncommitted changes: `git status --porcelain` is not empty.
+- **OOM during submission inference** — reduce `--batch-size`, remove `mixed_precision` from Accelerate or enable it (`bf16`), or switch to the TRT path.
+- **TRT: per-batch corruption after the first group of files** — this was a CUDA-stream sync bug (the fix is already in the code, see commit `98d0784`). If you build the engine in a different environment, check `benchmarking/benchmark_onnx_speed.py::TrtRunner.submit` — it contains `self.stream.wait_stream(torch.cuda.default_stream(...))`.
+- **Resume doesn't update the weights** — `train.verify_checkpoint_load=true` will fail at startup. Most likely an incorrect checkpoint path or a broken `latest.json`.
